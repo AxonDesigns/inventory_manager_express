@@ -6,32 +6,38 @@ import { eq } from "drizzle-orm";
 import { Request, Response } from "express";
 import { matchedData, validationResult } from "express-validator";
 
+export const userSelectExpandedFields = {
+  id: usersTable.id,
+  name: usersTable.name,
+  email: usersTable.email,
+  password: usersTable.password,
+  role: {
+    id: rolesTable.id,
+    name: rolesTable.name,
+    description: rolesTable.description,
+    createdAt: rolesTable.createdAt,
+    updatedAt: rolesTable.updatedAt
+  },
+  createdAt: usersTable.createdAt,
+  updatedAt: usersTable.updatedAt
+}
+
+export const userSelectFields = {
+  id: usersTable.id,
+  name: usersTable.name,
+  email: usersTable.email,
+  password: usersTable.password,
+  roleId: usersTable.roleId,
+  createdAt: usersTable.createdAt,
+  updatedAt: usersTable.updatedAt
+}
+
 const selectUsers = (expand: boolean) => {
-  return expand ? (
-    db.select({
-      id: usersTable.id,
-      name: usersTable.name,
-      email: usersTable.email,
-      role: {
-        id: rolesTable.id,
-        name: rolesTable.name,
-        description: rolesTable.description,
-        createdAt: rolesTable.createdAt,
-        updatedAt: rolesTable.updatedAt
-      },
-      createdAt: usersTable.createdAt,
-      updatedAt: usersTable.updatedAt
-    }).from(usersTable).innerJoin(rolesTable, eq(usersTable.roleId, rolesTable.id))
-  ) : (
-    db.select({
-      id: usersTable.id,
-      name: usersTable.name,
-      email: usersTable.email,
-      roleId: usersTable.roleId,
-      createdAt: usersTable.createdAt,
-      updatedAt: usersTable.updatedAt
-    }).from(usersTable)
-  );
+  if (expand) {
+    return db.select(userSelectExpandedFields).from(usersTable).innerJoin(rolesTable, eq(usersTable.roleId, rolesTable.id));
+  }
+
+  return db.select(userSelectFields).from(usersTable);
 }
 
 export const getUsers = async (req: Request, res: Response) => {
@@ -43,6 +49,8 @@ export const getUsers = async (req: Request, res: Response) => {
   const { limit, offset, expand } = matchedData(req) as { limit?: number, offset?: number, expand?: boolean };
 
   const foundUsers = await selectUsers(expand !== undefined).limit(limit ?? 20).offset(offset ?? 0);
+
+  console.log(req.cookies.access_token);
 
   res.json(foundUsers);
 };
