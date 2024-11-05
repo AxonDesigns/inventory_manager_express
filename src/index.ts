@@ -25,7 +25,7 @@ app.disable('x-powered-by');
 app.use("/api/users", usersRoute);
 app.use("/api/login", loginRoute);
 app.use("/api/logout", logoutRoute);
-app.use("/api/session", sessionRoute);
+app.use("/api/current-user", sessionRoute);
 
 app.get("/", (req, res) => {
   console.log(req.cookies)
