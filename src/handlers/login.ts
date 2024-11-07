@@ -38,8 +38,6 @@ export const login = async (req: Request, res: Response) => {
     expiresIn: "1h",
   });
 
-  console.log(accessToken);
-
   res.cookie("access_token", accessToken, {
     httpOnly: true,
     maxAge: 3600000,
