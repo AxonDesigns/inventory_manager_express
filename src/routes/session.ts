@@ -1,11 +1,11 @@
-import { getSession } from "@/handlers/session";
+import { getUserFromToken } from "@/handlers/session";
 import { Router } from "express";
 
 const router = Router();
 
 router.get(
   "/",
-  getSession
+  getUserFromToken
 );
 
 export default router;

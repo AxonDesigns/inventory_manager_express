@@ -23,9 +23,9 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.disable('x-powered-by');
 
 app.use("/api/users", usersRoute);
-app.use("/api/login", loginRoute);
-app.use("/api/logout", logoutRoute);
-app.use("/api/current-user", sessionRoute);
+app.use("/api/auth/login", loginRoute);
+app.use("/api/auth/logout", logoutRoute);
+app.use("/api/auth/me", sessionRoute);
 
 app.get("/", (req, res) => {
   console.log(req.cookies)

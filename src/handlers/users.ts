@@ -34,7 +34,8 @@ export const userSelectFields = {
 
 const selectUsers = (expand: boolean) => {
   if (expand) {
-    return db.select(userSelectExpandedFields).from(usersTable).innerJoin(rolesTable, eq(usersTable.roleId, rolesTable.id));
+    return db.select(userSelectExpandedFields).from(usersTable)
+      .innerJoin(rolesTable, eq(usersTable.roleId, rolesTable.id));
   }
 
   return db.select(userSelectFields).from(usersTable);
@@ -48,7 +49,8 @@ export const getUsers = async (req: Request, res: Response) => {
   }
   const { limit, offset, expand } = matchedData(req) as { limit?: number, offset?: number, expand?: boolean };
 
-  const foundUsers = await selectUsers(expand !== undefined).limit(limit ?? 20).offset(offset ?? 0);
+  const foundUsers = await selectUsers(expand !== undefined)
+    .limit(limit ?? 20).offset(offset ?? 0);
 
   console.log(req.cookies.access_token);
 
@@ -69,7 +71,8 @@ export const createUser = async (req: Request, res: Response) => {
     expand?: boolean
   };
 
-  const existentUser = await db.select().from(usersTable).where(eq(usersTable.email, email));
+  const existentUser = await db.select().from(usersTable)
+    .where(eq(usersTable.email, email));
   if (existentUser.length > 0) {
     res.status(400).json({ errors: ["Email already exists"] });
     return;
@@ -88,7 +91,8 @@ export const createUser = async (req: Request, res: Response) => {
     password: await hash(password, await genSalt()),
   }).$returningId();
 
-  const createdUsers = await selectUsers(expand !== undefined).where(eq(usersTable.id, createdIds[0].id));
+  const createdUsers = await selectUsers(expand !== undefined)
+    .where(eq(usersTable.id, createdIds[0].id));
 
   res.status(201).json(createdUsers[0]);
 };

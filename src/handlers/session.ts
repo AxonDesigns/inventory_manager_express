@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { verify } from "jsonwebtoken";
 
-export const getSession = async (req: Request, res: Response) => {
+export const getUserFromToken = async (req: Request, res: Response) => {
   const accessToken = req.cookies.access_token;
 
   if (!accessToken) {
@@ -9,6 +9,11 @@ export const getSession = async (req: Request, res: Response) => {
     return;
   }
 
-  const payload = verify(accessToken, process.env.ACCESS_TOKEN_SECRET as string);
-  res.json(payload);
+  try {
+    const payload = verify(accessToken, process.env.ACCESS_TOKEN_SECRET as string);
+    res.json(payload);
+  } catch (error) {
+    res.clearCookie("access_token");
+    res.status(500).json({ errors: ["Token is invalid"] });
+  }
 }

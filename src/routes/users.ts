@@ -12,7 +12,7 @@ const handlePostRoleBody = () => body("role").optional().isString().withMessage(
 const handlePostEmailBody = () => body("email").notEmpty().withMessage("email is required")
   .isEmail().withMessage("email is invalid");
 const handlePostPasswordBody = () => body("password").notEmpty().withMessage("password is required")
-  .isLength({ min: 8 }).withMessage("password must be at least 8 characters");
+  .isLength({ min: 8 }).withMessage("password must be at least 8 characters long");
 
 const handlePutNameBody = () => body("name").optional().isString().withMessage("name must be a string");
 const handlePutRoleBody = () => body("role").optional().isString().withMessage("role must be a string");
