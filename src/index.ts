@@ -28,8 +28,7 @@ app.use("/api/auth/logout", logoutRoute);
 app.use("/api/auth/me", sessionRoute);
 
 app.get("/", (req, res) => {
-  console.log(req.cookies)
-  res.send("Hello World!");
+  res.send((/^(?=[a-zA-Z0-9@._%+-]{1,254}$)([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9-]+\.[a-zA-Z]{2,})$/).toString());
 });
 
 app.listen(PORT, () => {

@@ -1,14 +1,14 @@
 import { db } from '@/db/database';
-import { rolesTable } from '@/db/schema/roles';
-import { usersTable } from '@/db/schema/users';
+import { rolesSchema } from '@/db/schema/roles';
+import { usersSchema } from '@/db/schema/users';
 import { genSalt, hash } from 'bcrypt';
 import { eq, or } from 'drizzle-orm';
-import { paymentMethodsTable, transactionCategoriesTable } from './schema/transactions';
+import { paymentMethodsSchema, transactionCategoriesSchema } from './schema/transactions';
 
 async function seedUsers() {
   await db.transaction(async (tx) => {
-    const existentAdminRole = await tx.select().from(rolesTable).where(eq(rolesTable.name, "admin"));
-    const existentUserRole = await tx.select().from(rolesTable).where(eq(rolesTable.name, "user"));
+    const existentAdminRole = await tx.select().from(rolesSchema).where(eq(rolesSchema.name, "admin"));
+    const existentUserRole = await tx.select().from(rolesSchema).where(eq(rolesSchema.name, "user"));
 
     const roles = [];
     if (existentAdminRole.length === 0) {
@@ -27,30 +27,30 @@ async function seedUsers() {
 
     if (roles.length === 0) return;
 
-    const savedIds = await tx.insert(rolesTable).values(roles).$returningId();
-    const savedRoles = await tx.select().from(rolesTable).where(or(...savedIds.map((savedId) => eq(rolesTable.id, savedId.id))));
+    const savedIds = await tx.insert(rolesSchema).values(roles).$returningId();
+    const savedRoles = await tx.select().from(rolesSchema).where(or(...savedIds.map((savedId) => eq(rolesSchema.id, savedId.id))));
     console.log(savedRoles);
   });
 
   await db.transaction(async (tx) => {
-    const exists = await tx.select().from(usersTable).where(eq(usersTable.email, 'admin@admin.com'));
+    const exists = await tx.select().from(usersSchema).where(eq(usersSchema.email, 'admin@admin.com'));
     if (exists.length > 0) return;
 
-    const roles = await tx.select({ id: rolesTable.id }).from(rolesTable).where(eq(rolesTable.name, 'admin'));
+    const roles = await tx.select({ id: rolesSchema.id }).from(rolesSchema).where(eq(rolesSchema.name, 'admin'));
 
     if (roles.length === 0) {
       console.error('Admin role not found!');
       return;
     }
 
-    const savedId = await tx.insert(usersTable).values({
+    const savedId = await tx.insert(usersSchema).values({
       name: 'Admin',
       email: 'admin@admin.com',
       roleId: roles[0].id,
       password: await hash(process.env.ADMIN_PASSWORD!, await genSalt()),
     }).$returningId();
 
-    const savedUser = await tx.select().from(usersTable).where(eq(usersTable.id, savedId[0].id));
+    const savedUser = await tx.select().from(usersSchema).where(eq(usersSchema.id, savedId[0].id));
     if (savedUser.length === 0) {
       console.error('Admin user not found!');
       return;
@@ -62,27 +62,27 @@ async function seedUsers() {
 async function seedPaymentMethods() {
   // Cash
   await db.transaction(async (tx) => {
-    const existent = await tx.select().from(paymentMethodsTable).where(eq(paymentMethodsTable.name, "Cash"));
+    const existent = await tx.select().from(paymentMethodsSchema).where(eq(paymentMethodsSchema.name, "Cash"));
     if (existent.length > 0) return;
-    await tx.insert(paymentMethodsTable).values({
+    await tx.insert(paymentMethodsSchema).values({
       name: "Cash",
     });
   });
 
   // Credit Card
   await db.transaction(async (tx) => {
-    const existent = await tx.select().from(paymentMethodsTable).where(eq(paymentMethodsTable.name, "Credit Card"));
+    const existent = await tx.select().from(paymentMethodsSchema).where(eq(paymentMethodsSchema.name, "Credit Card"));
     if (existent.length > 0) return;
-    await tx.insert(paymentMethodsTable).values({
+    await tx.insert(paymentMethodsSchema).values({
       name: "Credit Card",
     });
   });
 
   // Debit Card
   await db.transaction(async (tx) => {
-    const existent = await tx.select().from(paymentMethodsTable).where(eq(paymentMethodsTable.name, "Debit Card"));
+    const existent = await tx.select().from(paymentMethodsSchema).where(eq(paymentMethodsSchema.name, "Debit Card"));
     if (existent.length > 0) return;
-    await tx.insert(paymentMethodsTable).values({
+    await tx.insert(paymentMethodsSchema).values({
       name: "Debit Card",
     });
   });
@@ -91,72 +91,72 @@ async function seedPaymentMethods() {
 async function seedTransactionCategories() {
   // Food
   await db.transaction(async (tx) => {
-    const existent = await tx.select().from(transactionCategoriesTable).where(eq(transactionCategoriesTable.name, "Food"));
+    const existent = await tx.select().from(transactionCategoriesSchema).where(eq(transactionCategoriesSchema.name, "Food"));
     if (existent.length > 0) return;
-    await tx.insert(transactionCategoriesTable).values({
+    await tx.insert(transactionCategoriesSchema).values({
       name: "Food",
     });
   });
 
   //Transportation
   await db.transaction(async (tx) => {
-    const existent = await tx.select().from(transactionCategoriesTable).where(eq(transactionCategoriesTable.name, "Transportation"));
+    const existent = await tx.select().from(transactionCategoriesSchema).where(eq(transactionCategoriesSchema.name, "Transportation"));
     if (existent.length > 0) return;
-    await tx.insert(transactionCategoriesTable).values({
+    await tx.insert(transactionCategoriesSchema).values({
       name: "Transportation",
     });
   });
 
   //Entertainment
   await db.transaction(async (tx) => {
-    const existent = await tx.select().from(transactionCategoriesTable).where(eq(transactionCategoriesTable.name, "Entertainment"));
+    const existent = await tx.select().from(transactionCategoriesSchema).where(eq(transactionCategoriesSchema.name, "Entertainment"));
     if (existent.length > 0) return;
-    await tx.insert(transactionCategoriesTable).values({
+    await tx.insert(transactionCategoriesSchema).values({
       name: "Entertainment",
     });
   });
 
   // Health
   await db.transaction(async (tx) => {
-    const existent = await tx.select().from(transactionCategoriesTable).where(eq(transactionCategoriesTable.name, "Health"));
+    const existent = await tx.select().from(transactionCategoriesSchema).where(eq(transactionCategoriesSchema.name, "Health"));
     if (existent.length > 0) return;
-    await tx.insert(transactionCategoriesTable).values({
+    await tx.insert(transactionCategoriesSchema).values({
       name: "Health",
     });
   });
 
   // Cleaning
   await db.transaction(async (tx) => {
-    const existent = await tx.select().from(transactionCategoriesTable).where(eq(transactionCategoriesTable.name, "Cleaning"));
+    const existent = await tx.select().from(transactionCategoriesSchema).where(eq(transactionCategoriesSchema.name, "Cleaning"));
     if (existent.length > 0) return;
-    await tx.insert(transactionCategoriesTable).values({
+    await tx.insert(transactionCategoriesSchema).values({
       name: "Cleaning",
     });
   });
 
   // Technology
   await db.transaction(async (tx) => {
-    const existent = await tx.select().from(transactionCategoriesTable).where(eq(transactionCategoriesTable.name, "Technology"));
+    const existent = await tx.select().from(transactionCategoriesSchema).where(eq(transactionCategoriesSchema.name, "Technology"));
     if (existent.length > 0) return;
-    await tx.insert(transactionCategoriesTable).values({
+    await tx.insert(transactionCategoriesSchema).values({
       name: "Technology",
     });
   });
 
   // Stationery
   await db.transaction(async (tx) => {
-    const existent = await tx.select().from(transactionCategoriesTable).where(eq(transactionCategoriesTable.name, "Stationery"));
+    const existent = await tx.select().from(transactionCategoriesSchema).where(eq(transactionCategoriesSchema.name, "Stationery"));
     if (existent.length > 0) return;
-    await tx.insert(transactionCategoriesTable).values({
+    await tx.insert(transactionCategoriesSchema).values({
       name: "Stationery",
     });
   });
 
   // Other
   await db.transaction(async (tx) => {
-    const existent = await tx.select().from(transactionCategoriesTable).where(eq(transactionCategoriesTable.name, "Other"));
+    const existent = await tx.select().from(transactionCategoriesSchema).where(eq(transactionCategoriesSchema.name, "Other"));
     if (existent.length > 0) return;
-    await tx.insert(transactionCategoriesTable).values({
+    await tx.insert(transactionCategoriesSchema).values({
       name: "Other",
     });
   });

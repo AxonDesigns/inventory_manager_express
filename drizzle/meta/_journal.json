@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1734039360738,
+      "tag": "0000_fearless_dreadnoughts",
+      "breakpoints": true
+    }
+  ]
+}

@@ -1,8 +1,8 @@
-import { randomUUID } from "crypto";
-import { char, mysqlTable, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { mysqlTable, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { uuid } from "../utils";
 
-export const rolesTable = mysqlTable("roles", {
-  id: char("id", { length: 36 }).primaryKey().$default(() => randomUUID()),
+export const rolesSchema = mysqlTable("roles", {
+  id: uuid("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull().unique(),
   description: varchar("description", { length: 255 }).notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),

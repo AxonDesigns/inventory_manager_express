@@ -1,12 +1,12 @@
 import "dotenv/config";
 import { db } from "@/db/database";
-import { usersTable } from "@/db/schema/users";
+import { usersSchema } from "@/db/schema/users";
 import { compare } from "bcrypt";
 import { eq } from "drizzle-orm";
 import { Request, Response } from "express";
 import { matchedData, validationResult } from "express-validator";
 import { sign } from "jsonwebtoken";
-import { rolesTable } from "@/db/schema/roles";
+import { rolesSchema } from "@/db/schema/roles";
 import { userSelectExpandedFields as userSelectFieldsWithRole } from "@/handlers/users";
 
 export const login = async (req: Request, res: Response) => {
@@ -18,9 +18,9 @@ export const login = async (req: Request, res: Response) => {
   const { email, password } = matchedData(req) as { email: string, password: string };
 
   const foundUser = await db.select(userSelectFieldsWithRole)
-    .from(usersTable)
-    .innerJoin(rolesTable, eq(usersTable.roleId, rolesTable.id))
-    .where(eq(usersTable.email, email));
+    .from(usersSchema)
+    .innerJoin(rolesSchema, eq(usersSchema.roleId, rolesSchema.id))
+    .where(eq(usersSchema.email, email));
 
   if (foundUser.length === 0) {
     res.status(400).json({ errors: ["User not found"] });

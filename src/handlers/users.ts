@@ -1,44 +1,44 @@
 import { db } from "@/db/database";
-import { rolesTable } from "@/db/schema/roles";
-import { usersTable } from "@/db/schema/users";
+import { rolesSchema } from "@/db/schema/roles";
+import { usersSchema } from "@/db/schema/users";
 import { genSalt, hash } from "bcrypt";
 import { eq } from "drizzle-orm";
 import { Request, Response } from "express";
 import { matchedData, validationResult } from "express-validator";
 
 export const userSelectExpandedFields = {
-  id: usersTable.id,
-  name: usersTable.name,
-  email: usersTable.email,
-  password: usersTable.password,
+  id: usersSchema.id,
+  name: usersSchema.name,
+  email: usersSchema.email,
+  password: usersSchema.password,
   role: {
-    id: rolesTable.id,
-    name: rolesTable.name,
-    description: rolesTable.description,
-    createdAt: rolesTable.createdAt,
-    updatedAt: rolesTable.updatedAt
+    id: rolesSchema.id,
+    name: rolesSchema.name,
+    description: rolesSchema.description,
+    createdAt: rolesSchema.createdAt,
+    updatedAt: rolesSchema.updatedAt
   },
-  createdAt: usersTable.createdAt,
-  updatedAt: usersTable.updatedAt
+  createdAt: usersSchema.createdAt,
+  updatedAt: usersSchema.updatedAt
 }
 
 export const userSelectFields = {
-  id: usersTable.id,
-  name: usersTable.name,
-  email: usersTable.email,
-  password: usersTable.password,
-  roleId: usersTable.roleId,
-  createdAt: usersTable.createdAt,
-  updatedAt: usersTable.updatedAt
+  id: usersSchema.id,
+  name: usersSchema.name,
+  email: usersSchema.email,
+  password: usersSchema.password,
+  roleId: usersSchema.roleId,
+  createdAt: usersSchema.createdAt,
+  updatedAt: usersSchema.updatedAt
 }
 
 const selectUsers = (expand: boolean) => {
   if (expand) {
-    return db.select(userSelectExpandedFields).from(usersTable)
-      .innerJoin(rolesTable, eq(usersTable.roleId, rolesTable.id));
+    return db.select(userSelectExpandedFields).from(usersSchema)
+      .innerJoin(rolesSchema, eq(usersSchema.roleId, rolesSchema.id));
   }
 
-  return db.select(userSelectFields).from(usersTable);
+  return db.select(userSelectFields).from(usersSchema);
 }
 
 export const getUsers = async (req: Request, res: Response) => {
@@ -71,20 +71,20 @@ export const createUser = async (req: Request, res: Response) => {
     expand?: boolean
   };
 
-  const existentUser = await db.select().from(usersTable)
-    .where(eq(usersTable.email, email));
+  const existentUser = await db.select().from(usersSchema)
+    .where(eq(usersSchema.email, email));
   if (existentUser.length > 0) {
     res.status(400).json({ errors: ["Email already exists"] });
     return;
   }
 
   const existentRole = role ? (
-    await db.select().from(rolesTable).where(eq(rolesTable.name, role))
+    await db.select().from(rolesSchema).where(eq(rolesSchema.name, role))
   ) : (
-    await db.select().from(rolesTable).where(eq(rolesTable.name, "user"))
+    await db.select().from(rolesSchema).where(eq(rolesSchema.name, "user"))
   );
 
-  const createdIds = await db.insert(usersTable).values({
+  const createdIds = await db.insert(usersSchema).values({
     name,
     email,
     roleId: existentRole[0].id,
@@ -92,7 +92,7 @@ export const createUser = async (req: Request, res: Response) => {
   }).$returningId();
 
   const createdUsers = await selectUsers(expand !== undefined)
-    .where(eq(usersTable.id, createdIds[0].id));
+    .where(eq(usersSchema.id, createdIds[0].id));
 
   res.status(201).json(createdUsers[0]);
 };
@@ -105,7 +105,7 @@ export const getUserById = async (req: Request, res: Response) => {
   }
   const { id, expand } = matchedData(req) as { id: string, expand?: boolean };
 
-  const foundUsers = await selectUsers(expand !== undefined).where(eq(usersTable.id, id));
+  const foundUsers = await selectUsers(expand !== undefined).where(eq(usersSchema.id, id));
 
   res.json(foundUsers[0]);
 };
@@ -131,7 +131,7 @@ export const updateUser = async (req: Request, res: Response) => {
     return;
   }
 
-  const foundUsers = await selectUsers(true).where(eq(usersTable.id, id))
+  const foundUsers = await selectUsers(true).where(eq(usersSchema.id, id))
 
   if (foundUsers.length === 0) {
     res.status(404).json({ errors: ["User not found"] });
@@ -139,7 +139,7 @@ export const updateUser = async (req: Request, res: Response) => {
   }
 
   const existentRoles = role ? (
-    await db.select().from(rolesTable).where(eq(rolesTable.name, role))
+    await db.select().from(rolesSchema).where(eq(rolesSchema.name, role))
   ) : undefined;
 
   if (existentRoles && existentRoles.length === 0) {
@@ -147,14 +147,14 @@ export const updateUser = async (req: Request, res: Response) => {
     return;
   }
 
-  await db.update(usersTable).set({
+  await db.update(usersSchema).set({
     name: name,
     email: email,
     roleId: existentRoles ? existentRoles[0].id : undefined,
     password: password ? await hash(password, await genSalt()) : undefined,
   });
 
-  const updatedUsers = await selectUsers(expand !== undefined).where(eq(usersTable.id, id));
+  const updatedUsers = await selectUsers(expand !== undefined).where(eq(usersSchema.id, id));
 
   res.json(updatedUsers[0]);
 };
@@ -168,14 +168,14 @@ export const deleteUser = async (req: Request, res: Response) => {
 
   const { id, expand } = matchedData(req) as { id: string, expand?: boolean };
 
-  const foundUsers = await selectUsers(expand !== undefined).where(eq(usersTable.id, id))
+  const foundUsers = await selectUsers(expand !== undefined).where(eq(usersSchema.id, id))
 
   if (foundUsers.length === 0) {
     res.status(404).json({ errors: ["User not found"] });
     return;
   }
 
-  await db.delete(usersTable).where(eq(usersTable.id, id));
+  await db.delete(usersSchema).where(eq(usersSchema.id, id));
 
   res.json(foundUsers[0]);
 };

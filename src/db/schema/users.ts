@@ -1,13 +1,20 @@
-import { rolesTable } from "@/db/schema/roles";
-import { char, mysqlTable, timestamp, varchar } from "drizzle-orm/mysql-core";
-import { randomUUID } from "node:crypto";
+import { rolesSchema } from "@/db/schema/roles";
+import { sql } from "drizzle-orm";
+import { check, mysqlTable, varchar } from "drizzle-orm/mysql-core";
+import { emailRegex, timestamps, uuid } from "../utils";
 
-export const usersTable = mysqlTable("users", {
-  id: char("id", { length: 36 }).primaryKey().$default(() => randomUUID()),
+export const usersSchema = mysqlTable("users", {
+  id: uuid("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
-  roleId: char("role_id", { length: 36 }).references(() => rolesTable.id).notNull(),
+  roleId: uuid("role_id").references(() => rolesSchema.id).notNull(),
   email: varchar("email", { length: 255 }).notNull().unique(),
   password: varchar("password", { length: 255 }).notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
-});
+  ...timestamps,
+},
+  (table) => ({
+    emailConstraint: check("user_email_check_001", sql`${table.email} REGEXP '^(?=[a-zA-Z0-9@._%+-]{1,254}$)([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9-]+\\.[a-zA-Z]{2,})$'`),
+  })
+);
+
+export type SelectUser = typeof usersSchema.$inferSelect;
+export type InsertUser = typeof usersSchema.$inferInsert;
