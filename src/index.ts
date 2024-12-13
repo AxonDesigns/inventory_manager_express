@@ -4,6 +4,7 @@ import bodyParser from "body-parser";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import usersRoute from "@/routes/users"
+import userRolesRoute from "@/routes/user-roles";
 import loginRoute from "@/routes/login";
 import logoutRoute from "@/routes/logout";
 import sessionRoute from "@/routes/session";
@@ -23,6 +24,7 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.disable('x-powered-by');
 
 app.use("/api/users", usersRoute);
+app.use("/api/user-roles", userRolesRoute);
 app.use("/api/auth/login", loginRoute);
 app.use("/api/auth/logout", logoutRoute);
 app.use("/api/auth/me", sessionRoute);

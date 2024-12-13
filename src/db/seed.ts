@@ -1,14 +1,14 @@
 import { db } from '@/db/database';
-import { rolesSchema } from '@/db/schema/roles';
-import { usersSchema } from '@/db/schema/users';
+import { userRolesTable } from '@/db/schema/roles';
+import { usersTable } from '@/db/schema/users';
 import { genSalt, hash } from 'bcrypt';
 import { eq, or } from 'drizzle-orm';
 import { paymentMethodsSchema, transactionCategoriesSchema } from './schema/transactions';
 
 async function seedUsers() {
   await db.transaction(async (tx) => {
-    const existentAdminRole = await tx.select().from(rolesSchema).where(eq(rolesSchema.name, "admin"));
-    const existentUserRole = await tx.select().from(rolesSchema).where(eq(rolesSchema.name, "user"));
+    const existentAdminRole = await tx.select().from(userRolesTable).where(eq(userRolesTable.name, "admin"));
+    const existentUserRole = await tx.select().from(userRolesTable).where(eq(userRolesTable.name, "user"));
 
     const roles = [];
     if (existentAdminRole.length === 0) {
@@ -27,30 +27,30 @@ async function seedUsers() {
 
     if (roles.length === 0) return;
 
-    const savedIds = await tx.insert(rolesSchema).values(roles).$returningId();
-    const savedRoles = await tx.select().from(rolesSchema).where(or(...savedIds.map((savedId) => eq(rolesSchema.id, savedId.id))));
+    const savedIds = await tx.insert(userRolesTable).values(roles).$returningId();
+    const savedRoles = await tx.select().from(userRolesTable).where(or(...savedIds.map((savedId) => eq(userRolesTable.id, savedId.id))));
     console.log(savedRoles);
   });
 
   await db.transaction(async (tx) => {
-    const exists = await tx.select().from(usersSchema).where(eq(usersSchema.email, 'admin@admin.com'));
+    const exists = await tx.select().from(usersTable).where(eq(usersTable.email, 'admin@admin.com'));
     if (exists.length > 0) return;
 
-    const roles = await tx.select({ id: rolesSchema.id }).from(rolesSchema).where(eq(rolesSchema.name, 'admin'));
+    const roles = await tx.select({ id: userRolesTable.id }).from(userRolesTable).where(eq(userRolesTable.name, 'admin'));
 
     if (roles.length === 0) {
       console.error('Admin role not found!');
       return;
     }
 
-    const savedId = await tx.insert(usersSchema).values({
+    const savedId = await tx.insert(usersTable).values({
       name: 'Admin',
       email: 'admin@admin.com',
       roleId: roles[0].id,
       password: await hash(process.env.ADMIN_PASSWORD!, await genSalt()),
     }).$returningId();
 
-    const savedUser = await tx.select().from(usersSchema).where(eq(usersSchema.id, savedId[0].id));
+    const savedUser = await tx.select().from(usersTable).where(eq(usersTable.id, savedId[0].id));
     if (savedUser.length === 0) {
       console.error('Admin user not found!');
       return;

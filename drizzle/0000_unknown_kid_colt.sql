@@ -1,10 +1,10 @@
-CREATE TABLE `city` (
+CREATE TABLE `cities` (
 	`id` char(36) NOT NULL,
 	`name` varchar(255) NOT NULL,
 	`created_at` timestamp NOT NULL DEFAULT (now()),
 	`updated_at` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
-	CONSTRAINT `city_id` PRIMARY KEY(`id`),
-	CONSTRAINT `city_name_unique` UNIQUE(`name`)
+	CONSTRAINT `cities_id` PRIMARY KEY(`id`),
+	CONSTRAINT `cities_name_unique` UNIQUE(`name`)
 );
 --> statement-breakpoint
 CREATE TABLE `countries` (
@@ -30,49 +30,23 @@ CREATE TABLE `locations` (
 	CONSTRAINT `locations_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
-CREATE TABLE `state` (
+CREATE TABLE `states` (
 	`id` char(36) NOT NULL,
 	`name` varchar(255) NOT NULL,
 	`created_at` timestamp NOT NULL DEFAULT (now()),
 	`updated_at` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
-	CONSTRAINT `state_id` PRIMARY KEY(`id`),
-	CONSTRAINT `state_name_unique` UNIQUE(`name`)
+	CONSTRAINT `states_id` PRIMARY KEY(`id`),
+	CONSTRAINT `states_name_unique` UNIQUE(`name`)
 );
 --> statement-breakpoint
-CREATE TABLE `organization_types` (
-	`id` char(36) NOT NULL,
-	`name` varchar(255) NOT NULL,
-	`created_at` timestamp NOT NULL DEFAULT (now()),
-	`updated_at` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
-	CONSTRAINT `organization_types_id` PRIMARY KEY(`id`),
-	CONSTRAINT `organization_types_name_unique` UNIQUE(`name`)
-);
---> statement-breakpoint
-CREATE TABLE `organizations` (
-	`id` char(36) NOT NULL,
-	`name` varchar(255) NOT NULL,
-	`status` varchar(255) NOT NULL,
-	`type_id` char(36) NOT NULL,
-	`owner_id` char(36) NOT NULL,
-	`address` varchar(255) NOT NULL,
-	`phone` varchar(255) NOT NULL,
-	`email` varchar(255) NOT NULL,
-	`website` varchar(255) NOT NULL,
-	`created_at` timestamp NOT NULL DEFAULT (now()),
-	`updated_at` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
-	CONSTRAINT `organizations_id` PRIMARY KEY(`id`),
-	CONSTRAINT `org_phone_check_001` CHECK(`organizations`.`phone` REGEXP '^\+?[0-9]+$'),
-	CONSTRAINT `org_email_check_001` CHECK(`organizations`.`email` REGEXP '^(?=[a-zA-Z0-9@._%+-]{1,254}$)([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9-]+\.[a-zA-Z]{2,})$')
-);
---> statement-breakpoint
-CREATE TABLE `roles` (
+CREATE TABLE `user_roles` (
 	`id` char(36) NOT NULL,
 	`name` varchar(255) NOT NULL,
 	`description` varchar(255) NOT NULL,
 	`created_at` timestamp NOT NULL DEFAULT (now()),
 	`updated_at` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
-	CONSTRAINT `roles_id` PRIMARY KEY(`id`),
-	CONSTRAINT `roles_name_unique` UNIQUE(`name`)
+	CONSTRAINT `user_roles_id` PRIMARY KEY(`id`),
+	CONSTRAINT `user_roles_name_unique` UNIQUE(`name`)
 );
 --> statement-breakpoint
 CREATE TABLE `payment_methods` (
@@ -132,17 +106,15 @@ CREATE TABLE `users` (
 	`updated_at` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
 	CONSTRAINT `users_id` PRIMARY KEY(`id`),
 	CONSTRAINT `users_email_unique` UNIQUE(`email`),
-	CONSTRAINT `user_email_check_001` CHECK(`users`.`email` REGEXP '^(?=[a-zA-Z0-9@._%+-]{1,254}$)([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9-]+\.[a-zA-Z]{2,})$')
+	CONSTRAINT `user_email_check_001` CHECK(email REGEXP '^(?=[a-zA-Z0-9@._%+-]{1,254}$)([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9-]+\.[a-zA-Z]{2,})$')
 );
 --> statement-breakpoint
 ALTER TABLE `locations` ADD CONSTRAINT `locations_country_id_countries_id_fk` FOREIGN KEY (`country_id`) REFERENCES `countries`(`id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE `locations` ADD CONSTRAINT `locations_city_id_city_id_fk` FOREIGN KEY (`city_id`) REFERENCES `city`(`id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE `locations` ADD CONSTRAINT `locations_state_id_state_id_fk` FOREIGN KEY (`state_id`) REFERENCES `state`(`id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE `organizations` ADD CONSTRAINT `organizations_type_id_organization_types_id_fk` FOREIGN KEY (`type_id`) REFERENCES `organization_types`(`id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE `organizations` ADD CONSTRAINT `organizations_owner_id_users_id_fk` FOREIGN KEY (`owner_id`) REFERENCES `users`(`id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE `locations` ADD CONSTRAINT `locations_city_id_cities_id_fk` FOREIGN KEY (`city_id`) REFERENCES `cities`(`id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE `locations` ADD CONSTRAINT `locations_state_id_states_id_fk` FOREIGN KEY (`state_id`) REFERENCES `states`(`id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE `transaction_payments` ADD CONSTRAINT `transaction_payments_method_payment_methods_id_fk` FOREIGN KEY (`method`) REFERENCES `payment_methods`(`id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE `transaction_payments` ADD CONSTRAINT `transaction_payments_transaction_id_transactions_id_fk` FOREIGN KEY (`transaction_id`) REFERENCES `transactions`(`id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE `transactions` ADD CONSTRAINT `transactions_location_id_locations_id_fk` FOREIGN KEY (`location_id`) REFERENCES `locations`(`id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE `transactions` ADD CONSTRAINT `transactions_employee_id_users_id_fk` FOREIGN KEY (`employee_id`) REFERENCES `users`(`id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE `transactions` ADD CONSTRAINT `transactions_category_id_transaction_categories_id_fk` FOREIGN KEY (`category_id`) REFERENCES `transaction_categories`(`id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE `users` ADD CONSTRAINT `users_role_id_roles_id_fk` FOREIGN KEY (`role_id`) REFERENCES `roles`(`id`) ON DELETE no action ON UPDATE no action;
+ALTER TABLE `users` ADD CONSTRAINT `users_role_id_user_roles_id_fk` FOREIGN KEY (`role_id`) REFERENCES `user_roles`(`id`) ON DELETE no action ON UPDATE no action;
