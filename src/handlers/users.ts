@@ -1,5 +1,5 @@
 import { db } from "@/db/database";
-import { userRolesTable } from "@/db/schema/roles";
+import { SelectUserRole, userRolesTable } from "@/db/schema/roles";
 import { usersTable } from "@/db/schema/users";
 import { genSalt, hash } from "bcrypt";
 import { eq } from "drizzle-orm";
@@ -42,163 +42,184 @@ const selectUsers = (expand: boolean) => {
 }
 
 export const getUsers = async (req: Request, res: Response) => {
-  const results = validationResult(req);
-  if (!results.isEmpty()) {
-    res.status(400).json({ errors: results.array().map((err) => err.msg) });
-    return;
+  try {
+    const results = validationResult(req);
+    if (!results.isEmpty()) {
+      res.status(400).json({ errors: results.array().map((err) => err.msg) });
+      return;
+    }
+    const { limit, offset, expand } = matchedData(req) as { limit?: number, offset?: number, expand?: boolean };
+
+    const foundUsers = await selectUsers(expand !== undefined)
+      .limit(limit ?? 20).offset(offset ?? 0);
+
+    const users = foundUsers.map(({ password, ...payload }) => payload);
+
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ errors: ["An error occurred"] });
   }
-  const { limit, offset, expand } = matchedData(req) as { limit?: number, offset?: number, expand?: boolean };
-
-  const foundUsers = await selectUsers(expand !== undefined)
-    .limit(limit ?? 20).offset(offset ?? 0);
-
-  const users = foundUsers.map(({ password, ...payload }) => payload);
-
-  res.json(users);
 };
 
 export const createUser = async (req: Request, res: Response) => {
-  const results = validationResult(req);
-  if (!results.isEmpty()) {
-    res.status(400).json({ errors: results.array().map((err) => err.msg) });
-    return;
-  }
-  const { name, role, email, password, expand } = matchedData(req) as {
-    name: string,
-    role?: string,
-    email: string,
-    password: string,
-    expand?: boolean
-  };
+  try {
+    const results = validationResult(req);
+    if (!results.isEmpty()) {
+      res.status(400).json({ errors: results.array().map((err) => err.msg) });
+      return;
+    }
+    const { name, role, email, password, expand } = matchedData(req) as {
+      name: string,
+      role?: string,
+      email: string,
+      password: string,
+      expand?: boolean
+    };
 
-  const existentUser = await db.select().from(usersTable)
-    .where(eq(usersTable.email, email));
-  if (existentUser.length > 0) {
-    res.status(400).json({ errors: ["Email already exists"] });
-    return;
-  }
+    const existentUser = await db.select().from(usersTable)
+      .where(eq(usersTable.email, email));
+    if (existentUser.length > 0) {
+      res.status(400).json({ errors: ["Email already exists"] });
+      return;
+    }
 
-  if (!role) {
+    let existentRoles = [];
 
-  }
+    if (role) {
+      existentRoles = await db.select().from(userRolesTable).where(eq(userRolesTable.id, role))
 
-  let existentRoles = [];
-
-  if (role) {
-    existentRoles = await db.select().from(userRolesTable).where(eq(userRolesTable.id, role))
+      if (existentRoles.length === 0) {
+        existentRoles = await db.select().from(userRolesTable).where(eq(userRolesTable.name, role))
+      }
+    } else {
+      existentRoles = await db.select().from(userRolesTable).where(eq(userRolesTable.name, "user"))
+    }
 
     if (existentRoles.length === 0) {
-      existentRoles = await db.select().from(userRolesTable).where(eq(userRolesTable.name, role))
+      res.status(400).json({ errors: ["Role not found"] });
+      return;
     }
-  } else {
-    existentRoles = await db.select().from(userRolesTable).where(eq(userRolesTable.name, "user"))
+
+    const createdIds = await db.insert(usersTable).values({
+      name,
+      email,
+      roleId: existentRoles[0].id,
+      password: await hash(password, await genSalt()),
+    }).$returningId();
+
+    const createdUsers = await selectUsers(expand !== undefined)
+      .where(eq(usersTable.id, createdIds[0].id));
+
+    const { password: _, ...payload } = createdUsers[0];
+
+    res.status(201).json(payload);
+  } catch (error) {
+    res.status(500).json({ errors: ["An error occurred"] });
   }
-
-  if (existentRoles.length === 0) {
-    res.status(400).json({ errors: ["Role not found"] });
-    return;
-  }
-
-  const createdIds = await db.insert(usersTable).values({
-    name,
-    email,
-    roleId: existentRoles[0].id,
-    password: await hash(password, await genSalt()),
-  }).$returningId();
-
-  const createdUsers = await selectUsers(expand !== undefined)
-    .where(eq(usersTable.id, createdIds[0].id));
-
-  const { password: _, ...payload } = createdUsers[0];
-
-  res.status(201).json(payload);
 };
 
 export const getUserById = async (req: Request, res: Response) => {
-  const results = validationResult(req);
-  if (!results.isEmpty()) {
-    res.status(400).json({ errors: results.array().map((err) => err.msg) });
-    return;
+  try {
+    const results = validationResult(req);
+    if (!results.isEmpty()) {
+      res.status(400).json({ errors: results.array().map((err) => err.msg) });
+      return;
+    }
+    const { id, expand } = matchedData(req) as { id: string, expand?: boolean };
+
+    const foundUsers = await selectUsers(expand !== undefined).where(eq(usersTable.id, id));
+
+    const { password: _, ...payload } = foundUsers[0];
+
+    res.json(payload);
+  } catch (error) {
+    res.status(500).json({ errors: ["An error occurred"] });
   }
-  const { id, expand } = matchedData(req) as { id: string, expand?: boolean };
-
-  const foundUsers = await selectUsers(expand !== undefined).where(eq(usersTable.id, id));
-
-  const { password: _, ...payload } = foundUsers[0];
-
-  res.json(payload);
 };
 
 export const updateUser = async (req: Request, res: Response) => {
-  const results = validationResult(req);
-  if (!results.isEmpty()) {
-    res.status(400).json({ errors: results.array().map((err) => err.msg) });
-    return;
+  try {
+    const results = validationResult(req);
+    if (!results.isEmpty()) {
+      res.status(400).json({ errors: results.array().map((err) => err.msg) });
+      return;
+    }
+
+    const { id, name, role, email, password, expand } = matchedData(req) as {
+      id: string,
+      name?: string,
+      role?: string,
+      email?: string,
+      password?: string,
+      expand?: boolean
+    };
+
+    if (!name && !role && !email && !password) {
+      res.status(400).json({ errors: ["At least one field must be updated"] });
+      return;
+    }
+
+    const foundUsers = await selectUsers(true).where(eq(usersTable.id, id))
+
+    if (foundUsers.length === 0) {
+      res.status(404).json({ errors: ["User not found"] });
+      return;
+    }
+    let existentRoles: SelectUserRole[] = [];
+
+    if (role) {
+      existentRoles = await db.select().from(userRolesTable).where(eq(userRolesTable.id, role))
+
+      if (existentRoles.length === 0) {
+        existentRoles = await db.select().from(userRolesTable).where(eq(userRolesTable.name, role))
+      }
+    }
+
+    if (role && existentRoles.length === 0) {
+      res.status(404).json({ errors: ["Role not found"] });
+      return;
+    }
+
+    await db.update(usersTable).set({
+      name: foundUsers[0].name === name ? undefined : name,
+      email: foundUsers[0].email === email ? undefined : email,
+      roleId: existentRoles.length > 0 ? existentRoles[0].id : undefined,
+      password: password ? await hash(password, await genSalt()) : undefined,
+    }).where(eq(usersTable.id, id));
+
+    const updatedUsers = await selectUsers(expand !== undefined).where(eq(usersTable.id, id));
+
+    const { password: _, ...payload } = updatedUsers[0];
+
+    res.json(payload);
+  } catch (error) {
+    res.status(500).json({ errors: ["An error occurred"] });
   }
-
-  const { id, name, role, email, password, expand } = matchedData(req) as {
-    id: string,
-    name?: string,
-    role?: string,
-    email?: string,
-    password?: string,
-    expand?: boolean
-  };
-
-  if (!name && !role && !email && !password) {
-    res.status(400).json({ errors: ["At least one field must be updated"] });
-    return;
-  }
-
-  const foundUsers = await selectUsers(true).where(eq(usersTable.id, id))
-
-  if (foundUsers.length === 0) {
-    res.status(404).json({ errors: ["User not found"] });
-    return;
-  }
-
-  const existentRoles = role ? (
-    await db.select().from(userRolesTable).where(eq(userRolesTable.name, role))
-  ) : undefined;
-
-  if (existentRoles && existentRoles.length === 0) {
-    res.status(400).json({ errors: ["Role not found"] });
-    return;
-  }
-
-  await db.update(usersTable).set({
-    name: name,
-    email: email,
-    roleId: existentRoles ? existentRoles[0].id : undefined,
-    password: password ? await hash(password, await genSalt()) : undefined,
-  });
-
-  const updatedUsers = await selectUsers(expand !== undefined).where(eq(usersTable.id, id));
-
-  const { password: _, ...payload } = updatedUsers[0];
-
-  res.json(payload);
 };
 
 export const deleteUser = async (req: Request, res: Response) => {
-  const results = validationResult(req);
-  if (!results.isEmpty()) {
-    res.status(400).json({ errors: results.array().map((err) => err.msg) });
-    return;
+  try {
+    const results = validationResult(req);
+    if (!results.isEmpty()) {
+      res.status(400).json({ errors: results.array().map((err) => err.msg) });
+      return;
+    }
+
+    const { id, expand } = matchedData(req) as { id: string, expand?: boolean };
+
+    const foundUsers = await selectUsers(expand !== undefined).where(eq(usersTable.id, id))
+
+    if (foundUsers.length === 0) {
+      res.status(404).json({ errors: ["User not found"] });
+      return;
+    }
+
+    await db.delete(usersTable).where(eq(usersTable.id, id));
+
+    const { password: _, ...payload } = foundUsers[0];
+
+    res.json(payload);
+  } catch (error) {
+    res.status(500).json({ errors: ["An error occurred"] });
   }
-
-  const { id, expand } = matchedData(req) as { id: string, expand?: boolean };
-
-  const foundUsers = await selectUsers(expand !== undefined).where(eq(usersTable.id, id))
-
-  if (foundUsers.length === 0) {
-    res.status(404).json({ errors: ["User not found"] });
-    return;
-  }
-
-  await db.delete(usersTable).where(eq(usersTable.id, id));
-
-  const { password: _, ...payload } = foundUsers[0];
-
-  res.json(payload);
 };
