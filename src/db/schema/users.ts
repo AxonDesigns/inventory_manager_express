@@ -1,4 +1,4 @@
-import { userRolesTable } from "@/db/schema/roles";
+import { SelectUserRole, userRolesTable } from "@/db/schema/roles";
 import { sql } from "drizzle-orm";
 import { check, mysqlTable, varchar } from "drizzle-orm/mysql-core";
 import { emailRegex, timestamps, uuid } from "../utils";
@@ -18,3 +18,7 @@ export const usersTable = mysqlTable("users", {
 
 export type SelectUser = typeof usersTable.$inferSelect;
 export type InsertUser = typeof usersTable.$inferInsert;
+//Omit roleId
+export type SelectExpandedUser = Omit<SelectUser, "roleId"> & {
+  role: SelectUserRole;
+}

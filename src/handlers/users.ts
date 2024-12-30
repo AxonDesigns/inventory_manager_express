@@ -1,6 +1,6 @@
 import { db } from "@/db/database";
 import { SelectUserRole, userRolesTable } from "@/db/schema/roles";
-import { usersTable } from "@/db/schema/users";
+import { SelectExpandedUser, SelectUser, usersTable } from "@/db/schema/users";
 import { genSalt, hash } from "bcrypt";
 import { eq } from "drizzle-orm";
 import { Request, Response } from "express";
@@ -165,6 +165,18 @@ export const updateUser = async (req: Request, res: Response) => {
       res.status(404).json({ errors: ["User not found"] });
       return;
     }
+
+    const foundUser = foundUsers[0] as SelectExpandedUser;
+
+    if (
+      (name && foundUser.name !== name) ||
+      (role && foundUser.role.id !== role) ||
+      (email && foundUser.email !== email) ||
+      (password && foundUser.password !== password)
+    ) {
+
+    }
+
     let existentRoles: SelectUserRole[] = [];
 
     if (role) {
