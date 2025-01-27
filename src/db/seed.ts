@@ -170,6 +170,8 @@ async function main() {
   console.log('Payment methods seeded!');
   await seedTransactionCategories();
   console.log('Transaction categories seeded!');
+
+  process.exit(0);
 }
 
 main();

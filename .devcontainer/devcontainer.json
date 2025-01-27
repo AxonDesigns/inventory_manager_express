@@ -1,0 +1,19 @@
+{
+	"name": "Node.js & MySQL",
+	"dockerComposeFile": "../docker-compose.yml",
+	"service": "app",
+	"workspaceFolder": "/app",
+	"postCreateCommand": "npm install --no-audit",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-azuretools.vscode-docker",
+				"cweijan.vscode-database-client2",
+				"yoavbls.pretty-ts-errors"
+			],
+			"settings": {
+				"editor.formatOnSave": true
+			}
+		}
+	}
+}

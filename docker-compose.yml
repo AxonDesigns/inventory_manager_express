@@ -1,0 +1,24 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - 3000:3000
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+    command: bash -c "sleep infinity"
+  db:
+    image: mysql:latest
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: 1234
+      MYSQL_DATABASE: inventory_manager
+    ports:
+      - 3306:3306
+    volumes:
+      - ./db_data:/var/lib/mysql
+volumes:
+  db_data:
