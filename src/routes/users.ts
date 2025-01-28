@@ -9,6 +9,7 @@ const handleLimitQuery = () => query("limit").optional().isInt().withMessage("li
 const handleOffsetQuery = () => query("offset").optional().isInt().withMessage("offset must be a number");
 const handlePostNameBody = () => body("name").notEmpty().withMessage("name is required");
 const handlePostRoleBody = () => body("role").optional().isString().withMessage("role must be a string");
+const handlePostStatusBody = () => body("status").optional().isString().withMessage("role must be a string");
 const handlePostEmailBody = () => body("email").notEmpty().withMessage("email is required")
   .isEmail().withMessage("email is invalid");
 const handlePostPasswordBody = () => body("password").notEmpty().withMessage("password is required")
@@ -32,6 +33,7 @@ router.post("/",
   handleExpandQuery(),
   handlePostNameBody().trim(),
   handlePostRoleBody().trim(),
+  handlePostStatusBody().trim(),
   handlePostEmailBody().trim(),
   handlePostPasswordBody().trim(),
   createUser

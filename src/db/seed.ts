@@ -4,8 +4,10 @@ import { usersTable } from '@/db/schema/users';
 import { genSalt, hash } from 'bcrypt';
 import { eq, or } from 'drizzle-orm';
 import { paymentMethodsSchema, transactionCategoriesSchema } from './schema/transactions';
+import { InsertUserStatus, userStatusTable } from './schema/user-status';
 
 async function seedUsers() {
+  // Seed roles
   await db.transaction(async (tx) => {
     const existentAdminRole = await tx.select().from(userRolesTable).where(eq(userRolesTable.name, "admin"));
     const existentUserRole = await tx.select().from(userRolesTable).where(eq(userRolesTable.name, "user"));
@@ -30,6 +32,47 @@ async function seedUsers() {
     const savedIds = await tx.insert(userRolesTable).values(roles).$returningId();
     const savedRoles = await tx.select().from(userRolesTable).where(or(...savedIds.map((savedId) => eq(userRolesTable.id, savedId.id))));
     console.log(savedRoles);
+  });
+
+  await db.transaction(async (tx) => {
+    const existentActiveStatus = await tx.select().from(userStatusTable).where(eq(userStatusTable.name, "active"));
+    const existentInactiveStatus = await tx.select().from(userStatusTable).where(eq(userStatusTable.name, "inactive"));
+    const existentSuspendedStatus = await tx.select().from(userStatusTable).where(eq(userStatusTable.name, "suspended"));
+    const existentPendingStatus = await tx.select().from(userStatusTable).where(eq(userStatusTable.name, "pending"));
+
+    const statuses = [] as InsertUserStatus[]
+    if (existentActiveStatus.length === 0) {
+      statuses.push({
+        name: "active",
+        description: "Active",
+      })
+    }
+
+    if (existentInactiveStatus.length === 0) {
+      statuses.push({
+        name: "inactive",
+        description: "Inactive",
+      })
+    }
+
+    if (existentSuspendedStatus.length === 0) {
+      statuses.push({
+        name: "suspended",
+        description: "Suspended",
+      })
+    }
+
+    if (existentPendingStatus.length === 0) {
+      statuses.push({
+        name: "pending",
+        description: "Pending",
+      })
+    }
+
+    if (statuses.length === 0) return;
+
+    const storedIds = await tx.insert(userStatusTable).values(statuses).$returningId();
+    console.log(statuses, "has been added with ids ", storedIds);
   });
 
   await db.transaction(async (tx) => {

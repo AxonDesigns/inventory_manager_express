@@ -1,44 +1,27 @@
 import { db } from "@/db/database";
 import { SelectUserRole, userRolesTable } from "@/db/schema/roles";
-import { SelectExpandedUser, SelectUser, usersTable } from "@/db/schema/users";
+import { userStatusTable } from "@/db/schema/user-status";
+import { usersTable } from "@/db/schema/users";
 import { genSalt, hash } from "bcrypt";
-import { eq } from "drizzle-orm";
+import { eq, getTableColumns } from "drizzle-orm";
 import { Request, Response } from "express";
 import { matchedData, validationResult } from "express-validator";
 
-export const userSelectExpandedFields = {
-  id: usersTable.id,
-  name: usersTable.name,
-  email: usersTable.email,
-  password: usersTable.password,
-  role: {
-    id: userRolesTable.id,
-    name: userRolesTable.name,
-    description: userRolesTable.description,
-    createdAt: userRolesTable.createdAt,
-    updatedAt: userRolesTable.updatedAt
-  },
-  createdAt: usersTable.createdAt,
-  updatedAt: usersTable.updatedAt
-}
-
-export const userSelectFields = {
-  id: usersTable.id,
-  name: usersTable.name,
-  email: usersTable.email,
-  password: usersTable.password,
-  roleId: usersTable.roleId,
-  createdAt: usersTable.createdAt,
-  updatedAt: usersTable.updatedAt
-}
-
-const selectUsers = (expand: boolean) => {
-  if (expand) {
-    return db.select(userSelectExpandedFields).from(usersTable)
-      .innerJoin(userRolesTable, eq(usersTable.roleId, userRolesTable.id));
+export const selectUsersExpanded = () => {
+  const { roleId, statusId, ...userColumns } = getTableColumns(usersTable);
+  const userSelectExpandedFields = {
+    ...userColumns,
+    role: getTableColumns(userRolesTable),
+    status: getTableColumns(userStatusTable),
   }
 
-  return db.select(userSelectFields).from(usersTable);
+  return db.select(userSelectExpandedFields).from(usersTable)
+    .innerJoin(userRolesTable, eq(usersTable.roleId, userRolesTable.id))
+    .innerJoin(userStatusTable, eq(usersTable.statusId, userStatusTable.id));
+}
+
+const selectUsers = () => {
+  return db.select().from(usersTable);
 }
 
 export const getUsers = async (req: Request, res: Response) => {
@@ -49,14 +32,15 @@ export const getUsers = async (req: Request, res: Response) => {
       return;
     }
     const { limit, offset, expand } = matchedData(req) as { limit?: number, offset?: number, expand?: boolean };
-
-    const foundUsers = await selectUsers(expand !== undefined)
+    const shouldExpand = expand !== undefined || expand;
+    const foundUsers = await (shouldExpand ? selectUsersExpanded() : selectUsers())
       .limit(limit ?? 20).offset(offset ?? 0);
 
     const users = foundUsers.map(({ password, ...payload }) => payload);
 
     res.json(users);
   } catch (error) {
+    console.log(error);
     res.status(500).json({ errors: ["An error occurred"] });
   }
 };
@@ -68,9 +52,10 @@ export const createUser = async (req: Request, res: Response) => {
       res.status(400).json({ errors: results.array().map((err) => err.msg) });
       return;
     }
-    const { name, role, email, password, expand } = matchedData(req) as {
+    const { name, role, status, email, password, expand } = matchedData(req) as {
       name: string,
       role?: string,
+      status?: string,
       email: string,
       password: string,
       expand?: boolean
@@ -83,37 +68,40 @@ export const createUser = async (req: Request, res: Response) => {
       return;
     }
 
-    let existentRoles = [];
-
-    if (role) {
-      existentRoles = await db.select().from(userRolesTable).where(eq(userRolesTable.id, role))
-
-      if (existentRoles.length === 0) {
-        existentRoles = await db.select().from(userRolesTable).where(eq(userRolesTable.name, role))
-      }
-    } else {
-      existentRoles = await db.select().from(userRolesTable).where(eq(userRolesTable.name, "user"))
-    }
-
-    if (existentRoles.length === 0) {
+    const [existentRole] = await db.select().from(userRolesTable).where(eq(userRolesTable.id, role ?? "user"))
+    if (!existentRole) {
       res.status(400).json({ errors: ["Role not found"] });
       return;
     }
 
-    const createdIds = await db.insert(usersTable).values({
+    if (!existentRole) {
+      res.status(400).json({ errors: ["Role not found"] });
+      return;
+    }
+
+    const [foundStatus] = await db.select().from(userStatusTable).where(eq(userStatusTable.name, status ?? "pending"));
+
+    if (!foundStatus) {
+      res.status(400).json({ errors: ["Pending role not found"] });
+      return;
+    }
+
+    const [{ id: createdId }] = await db.insert(usersTable).values({
       name,
       email,
-      roleId: existentRoles[0].id,
+      roleId: existentRole.id,
+      statusId: foundStatus.id,
       password: await hash(password, await genSalt()),
     }).$returningId();
 
-    const createdUsers = await selectUsers(expand !== undefined)
-      .where(eq(usersTable.id, createdIds[0].id));
+    const createdUsers = await (expand ? selectUsersExpanded() : selectUsers())
+      .where(eq(usersTable.id, createdId));
 
     const { password: _, ...payload } = createdUsers[0];
 
     res.status(201).json(payload);
   } catch (error) {
+    console.log(error);
     res.status(500).json({ errors: ["An error occurred"] });
   }
 };
@@ -127,7 +115,7 @@ export const getUserById = async (req: Request, res: Response) => {
     }
     const { id, expand } = matchedData(req) as { id: string, expand?: boolean };
 
-    const foundUsers = await selectUsers(expand !== undefined).where(eq(usersTable.id, id));
+    const foundUsers = await (expand ? selectUsersExpanded() : selectUsers()).where(eq(usersTable.id, id));
 
     const { password: _, ...payload } = foundUsers[0];
 
@@ -145,10 +133,11 @@ export const updateUser = async (req: Request, res: Response) => {
       return;
     }
 
-    const { id, name, role, email, password, expand } = matchedData(req) as {
+    const { id, name, role, status, email, password, expand } = matchedData(req) as {
       id: string,
       name?: string,
       role?: string,
+      status?: string,
       email?: string,
       password?: string,
       expand?: boolean
@@ -159,18 +148,17 @@ export const updateUser = async (req: Request, res: Response) => {
       return;
     }
 
-    const foundUsers = await selectUsers(true).where(eq(usersTable.id, id))
+    const [foundUser] = await selectUsersExpanded().where(eq(usersTable.id, id));
 
-    if (foundUsers.length === 0) {
+    if (!foundUser) {
       res.status(404).json({ errors: ["User not found"] });
       return;
     }
 
-    const foundUser = foundUsers[0] as SelectExpandedUser;
-
     if (
       (name && foundUser.name !== name) ||
       (role && foundUser.role.id !== role) ||
+      (status && foundUser.status.id !== status) ||
       (email && foundUser.email !== email) ||
       (password && foundUser.password !== password)
     ) {
@@ -193,13 +181,13 @@ export const updateUser = async (req: Request, res: Response) => {
     }
 
     await db.update(usersTable).set({
-      name: foundUsers[0].name === name ? undefined : name,
-      email: foundUsers[0].email === email ? undefined : email,
+      name: foundUser.name === name ? undefined : name,
+      email: foundUser.email === email ? undefined : email,
       roleId: existentRoles.length > 0 ? existentRoles[0].id : undefined,
       password: password ? await hash(password, await genSalt()) : undefined,
     }).where(eq(usersTable.id, id));
 
-    const updatedUsers = await selectUsers(expand !== undefined).where(eq(usersTable.id, id));
+    const updatedUsers = await (expand ? selectUsersExpanded() : selectUsers()).where(eq(usersTable.id, id));
 
     const { password: _, ...payload } = updatedUsers[0];
 
@@ -219,7 +207,7 @@ export const deleteUser = async (req: Request, res: Response) => {
 
     const { id, expand } = matchedData(req) as { id: string, expand?: boolean };
 
-    const foundUsers = await selectUsers(expand !== undefined).where(eq(usersTable.id, id))
+    const foundUsers = await (expand ? selectUsersExpanded() : selectUsers()).where(eq(usersTable.id, id))
 
     if (foundUsers.length === 0) {
       res.status(404).json({ errors: ["User not found"] });

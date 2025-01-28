@@ -9,6 +9,8 @@ services:
       - .:/app
     depends_on:
       - db
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
     command: bash -c "sleep infinity"
   db:
     image: mysql:latest

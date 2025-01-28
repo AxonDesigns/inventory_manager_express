@@ -7,7 +7,7 @@ import { Request, Response } from "express";
 import { matchedData, validationResult } from "express-validator";
 import { sign } from "jsonwebtoken";
 import { userRolesTable } from "@/db/schema/roles";
-import { userSelectExpandedFields as userSelectFieldsWithRole } from "@/handlers/users";
+import { selectUsersExpanded } from "./users";
 
 export const login = async (req: Request, res: Response) => {
   const results = validationResult(req);
@@ -17,10 +17,7 @@ export const login = async (req: Request, res: Response) => {
   }
   const { email, password } = matchedData(req) as { email: string, password: string };
 
-  const foundUser = await db.select(userSelectFieldsWithRole)
-    .from(usersTable)
-    .innerJoin(userRolesTable, eq(usersTable.roleId, userRolesTable.id))
-    .where(eq(usersTable.email, email));
+  const foundUser = await selectUsersExpanded().where(eq(usersTable.email, email));
 
   if (foundUser.length === 0) {
     res.status(400).json({ errors: ["User not found"] });
