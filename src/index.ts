@@ -8,7 +8,7 @@ import userRolesRoute from "@/routes/user-roles";
 import loginRoute from "@/routes/login";
 import logoutRoute from "@/routes/logout";
 import sessionRoute from "@/routes/session";
-import api from "@/middlewares/api";
+import authMiddleware from "@/middlewares/auth";
 
 const PORT = process.env.PORT || 3000;
 const app = express();
@@ -24,7 +24,7 @@ app.use(bodyParser.urlencoded({ extended: false }));
 
 app.disable('x-powered-by');
 
-app.use("/api", api);
+app.use("/api", authMiddleware);
 
 app.use("/api/users", usersRoute);
 app.use("/api/user-roles", userRolesRoute);
