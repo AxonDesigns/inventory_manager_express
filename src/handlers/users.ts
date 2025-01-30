@@ -1,6 +1,6 @@
 import { db } from "@/db/database";
-import { SelectUserRole, userRolesTable } from "@/db/schema/roles";
-import { userStatusTable } from "@/db/schema/user-status";
+import { SelectUserRole, userRolesTable } from "@/db/schema/user-roles";
+import { userStatusesTable } from "@/db/schema/user-status";
 import { usersTable } from "@/db/schema/users";
 import { genSalt, hash } from "bcrypt";
 import { eq, getTableColumns } from "drizzle-orm";
@@ -12,12 +12,12 @@ export const selectUsersExpanded = () => {
   const userSelectExpandedFields = {
     ...userColumns,
     role: getTableColumns(userRolesTable),
-    status: getTableColumns(userStatusTable),
+    status: getTableColumns(userStatusesTable),
   }
 
   return db.select(userSelectExpandedFields).from(usersTable)
     .innerJoin(userRolesTable, eq(usersTable.roleId, userRolesTable.id))
-    .innerJoin(userStatusTable, eq(usersTable.statusId, userStatusTable.id));
+    .innerJoin(userStatusesTable, eq(usersTable.statusId, userStatusesTable.id));
 }
 
 const selectUsers = () => {
@@ -79,7 +79,7 @@ export const createUser = async (req: Request, res: Response) => {
       return;
     }
 
-    const [foundStatus] = await db.select().from(userStatusTable).where(eq(userStatusTable.name, status ?? "pending"));
+    const [foundStatus] = await db.select().from(userStatusesTable).where(eq(userStatusesTable.name, status ?? "pending"));
 
     if (!foundStatus) {
       res.status(400).json({ errors: ["Pending role not found"] });

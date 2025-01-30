@@ -6,7 +6,6 @@ import { eq } from "drizzle-orm";
 import { Request, Response } from "express";
 import { matchedData, validationResult } from "express-validator";
 import { sign } from "jsonwebtoken";
-import { userRolesTable } from "@/db/schema/roles";
 import { selectUsersExpanded } from "./users";
 
 export const login = async (req: Request, res: Response) => {
