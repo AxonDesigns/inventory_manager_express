@@ -10,6 +10,7 @@
     "db:migrate": "drizzle-kit migrate --config=./drizzle.config.ts",
     "db:submit": "drizzle-kit generate --config=./drizzle.config.ts && drizzle-kit migrate --config=./drizzle.config.ts",
     "db:push": "drizzle-kit push --config=./drizzle.config.ts",
+    "db:pull": "drizzle-kit pull --config=./drizzle.config.ts",
     "db:studio": "drizzle-kit studio --config=./drizzle.config.ts",
     "db:seed": "tsx src/db/seed.ts",
     "db:create": "drizzle-kit push --config=./drizzle.config.ts && tsx src/db/seed.ts",

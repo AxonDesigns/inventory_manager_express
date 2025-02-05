@@ -4,7 +4,8 @@ import { usersTable } from '@/db/schema/users';
 import { genSalt, hash } from 'bcrypt';
 import { eq, or } from 'drizzle-orm';
 import { paymentMethodsSchema, transactionCategoriesSchema } from './schema/transactions';
-import { InsertUserStatus, userStatusesTable } from './schema/user-status';
+import { InsertUserStatus, userStatusesTable } from './schema/user-statuses';
+import { thirdPartyStatusesTable } from './schema/third-parties';
 
 async function seedUsers() {
   // Seed roles
@@ -139,6 +140,28 @@ async function seedPaymentMethods() {
   });
 }
 
+async function seedThirdPartyStatuses() {
+  // Inactive
+  await db.transaction(async (tx) => {
+    const existent = await tx.select().from(thirdPartyStatusesTable).where(eq(thirdPartyStatusesTable.name, "inactive"));
+    if (existent.length > 0) return;
+    await tx.insert(thirdPartyStatusesTable).values({
+      name: "inactive",
+      description: "Inactive"
+    });
+  });
+
+  // Active
+  await db.transaction(async (tx) => {
+    const existent = await tx.select().from(thirdPartyStatusesTable).where(eq(thirdPartyStatusesTable.name, "active"));
+    if (existent.length > 0) return;
+    await tx.insert(thirdPartyStatusesTable).values({
+      name: "active",
+      description: "Active"
+    });
+  });
+}
+
 async function seedTransactionCategories() {
   // Food
   await db.transaction(async (tx) => {
@@ -219,6 +242,8 @@ async function main() {
   console.log('Users and roles seeded!');
   await seedPaymentMethods();
   console.log('Payment methods seeded!');
+  await seedThirdPartyStatuses();
+  console.log('Third Party Statuses seeded!');
   await seedTransactionCategories();
   console.log('Transaction categories seeded!');
 

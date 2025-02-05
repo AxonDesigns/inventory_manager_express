@@ -2,7 +2,7 @@ import { SelectUserRole, userRolesTable } from "@/db/schema/user-roles";
 import { sql } from "drizzle-orm";
 import { check, mysqlTable, varchar } from "drizzle-orm/mysql-core";
 import { emailRegex, timestamps, uuid } from "../utils";
-import { SelectUserStatus, userStatusesTable } from "./user-status";
+import { SelectUserStatus, userStatusesTable } from "./user-statuses";
 
 export const usersTable = mysqlTable("users", {
   id: uuid("id").primaryKey(),
@@ -15,7 +15,7 @@ export const usersTable = mysqlTable("users", {
   ...timestamps,
 },
   (table) => ({
-    emailConstraint: check("user_email_check_001", sql.raw(`${table.email.name} REGEXP '${emailRegex}'`)),
+    emailConstraint: check("users_email_check_001", sql.raw(`${table.email.name} REGEXP '${emailRegex}'`)),
   })
 );
 
