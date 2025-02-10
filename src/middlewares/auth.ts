@@ -8,7 +8,7 @@ type PublicEndpoint = {
 
 // Configuration - define your public endpoints here
 const PUBLIC_ENDPOINTS: PublicEndpoint[] = [
-  { path: '/auth/login', methods: ['POST'] },
+  { path: '/api/auth/login', methods: ['POST'] },
   { path: '/public', methods: ['GET'] }
 ];
 

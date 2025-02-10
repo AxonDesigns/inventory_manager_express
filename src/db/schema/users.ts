@@ -1,15 +1,15 @@
-import { SelectUserRole, userRolesTable } from "@/db/schema/user-roles";
+import { userRolesTable } from "@/db/schema/user-roles";
 import { sql } from "drizzle-orm";
 import { check, mysqlTable, varchar } from "drizzle-orm/mysql-core";
-import { emailRegex, timestamps, uuid } from "../utils";
-import { SelectUserStatus, userStatusesTable } from "./user-statuses";
+import { bigIntId, emailRegex, primaryKey, timestamps } from "../utils";
+import { userStatusesTable } from "./user-statuses";
 
 export const usersTable = mysqlTable("users", {
-  id: uuid("id").primaryKey(),
+  ...primaryKey,
   name: varchar("name", { length: 255 }).notNull(),
   email: varchar("email", { length: 255 }).notNull().unique(),
-  roleId: uuid("role_id").references(() => userRolesTable.id).notNull(),
-  statusId: uuid("status_id").references(() => userStatusesTable.id).notNull(),
+  roleId: bigIntId("role_id").references(() => userRolesTable.id, { onDelete: "restrict", onUpdate: "cascade" }).notNull(),
+  statusId: bigIntId("status_id").references(() => userStatusesTable.id, { onDelete: "restrict", onUpdate: "cascade" }).notNull(),
   password: varchar("password", { length: 255 }).notNull(),
   verificationToken: varchar("verification_token", { length: 32 }),
   ...timestamps,
@@ -18,11 +18,3 @@ export const usersTable = mysqlTable("users", {
     emailConstraint: check("users_email_check_001", sql.raw(`${table.email.name} REGEXP '${emailRegex}'`)),
   })
 );
-
-export type SelectUser = typeof usersTable.$inferSelect;
-export type InsertUser = typeof usersTable.$inferInsert;
-
-export type SelectExpandedUser = Omit<SelectUser, "roleId" | "statusId"> & {
-  role: SelectUserRole;
-  status: SelectUserStatus;
-}

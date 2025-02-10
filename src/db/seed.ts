@@ -4,8 +4,11 @@ import { usersTable } from '@/db/schema/users';
 import { genSalt, hash } from 'bcrypt';
 import { eq, or } from 'drizzle-orm';
 import { paymentMethodsSchema, transactionCategoriesSchema } from './schema/transactions';
-import { InsertUserStatus, userStatusesTable } from './schema/user-statuses';
+import { userStatusesTable } from './schema/user-statuses';
 import { thirdPartyStatusesTable } from './schema/third-parties';
+import { getUserRole } from '@/handlers/user-roles';
+import { getUserStatus } from '@/handlers/user-statuses';
+import { InsertUserStatus } from '@/types';
 
 async function seedUsers() {
   // Seed roles
@@ -80,25 +83,16 @@ async function seedUsers() {
     const [exists] = await tx.select().from(usersTable).where(eq(usersTable.email, 'admin@admin.com'));
     if (exists) return;
 
-    const [role] = await tx.select({ id: userRolesTable.id }).from(userRolesTable).where(eq(userRolesTable.name, 'admin'));
+    const roleId = (await getUserRole({ name: "admin" }))?.id;
+    const statusId = (await getUserStatus({ name: "active" }))?.id;
 
-    if (!role) {
-      console.error('Admin role not found!');
-      return;
-    }
-
-    const [existentStatus] = await tx.select().from(userStatusesTable).where(eq(userStatusesTable.name, "active"));
-
-    if (!existentStatus) {
-      console.error('active status not found!');
-      return;
-    }
+    if (!roleId || !statusId) return;
 
     const savedId = await tx.insert(usersTable).values({
       name: 'Admin',
       email: 'admin@admin.com',
-      roleId: role.id,
-      statusId: existentStatus.id,
+      roleId: roleId,
+      statusId: statusId,
       password: await hash(process.env.ADMIN_PASSWORD!, await genSalt()),
     }).$returningId();
 

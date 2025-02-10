@@ -1,12 +1,9 @@
-import "dotenv/config";
-import { db } from "@/db/database";
-import { usersTable } from "@/db/schema/users";
+import { getUserByEmail } from "@/handlers/users";
 import { compare } from "bcrypt";
-import { eq } from "drizzle-orm";
+import "dotenv/config";
 import { Request, Response } from "express";
 import { matchedData, validationResult } from "express-validator";
 import { sign } from "jsonwebtoken";
-import { selectUsersExpanded } from "./users";
 
 export const login = async (req: Request, res: Response) => {
   const results = validationResult(req);
@@ -14,23 +11,26 @@ export const login = async (req: Request, res: Response) => {
     res.status(400).json({ errors: results.array().map((err) => err.msg) });
     return;
   }
-  const { email, password } = matchedData(req) as { email: string, password: string };
+  const { email, password, expand } = matchedData(req) as { email: string, password: string, expand?: boolean };
 
-  const foundUser = await selectUsersExpanded().where(eq(usersTable.email, email));
+  const foundUser = await getUserByEmail(email, {
+    expand: expand !== undefined,
+    asPrivate: true,
+  });
 
-  if (foundUser.length === 0) {
+  if (!foundUser) {
     res.status(400).json({ errors: ["User not found"] });
     return;
   }
 
-  if (!(await compare(password, foundUser[0].password))) {
+  if (!(await compare(password, foundUser.password))) {
     res.status(400).json({ errors: ["Invalid password"] });
     return;
   }
 
-  const { password: hashedPassword, ...payload } = foundUser[0];
+  const { password: hashedPassword, verificationToken, ...rest } = foundUser;
 
-  const accessToken = sign(payload, process.env.ACCESS_TOKEN_SECRET as string, {
+  const accessToken = sign(rest, process.env.ACCESS_TOKEN_SECRET as string, {
     expiresIn: "1h",
   });
 
@@ -41,5 +41,5 @@ export const login = async (req: Request, res: Response) => {
     secure: process.env.NODE_ENV === "production",
   });
 
-  res.json(payload);
+  res.json(rest);
 }
