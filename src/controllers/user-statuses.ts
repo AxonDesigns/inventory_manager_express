@@ -1,103 +1,156 @@
 import { userStatusesTable } from "@/db/schema/user-statuses";
 import { ilike } from "@/db/utils";
-import { createUserStatus, deleteUserStatus, getUserStatus, getUserStatuses, updateUserStatus } from "@/handlers/user-statuses";
+import { UserStatusesHandler } from "@/handlers/user-statuses";
+import { DatabaseError } from "@/lib/errors";
+import { zodErrorToErrorList } from "@/lib/utils";
 import { SQL } from "drizzle-orm";
 import { Request, Response } from "express";
-import { matchedData, validationResult } from "express-validator";
+import { z } from "zod";
 
-export const getUserStatusesController = async (req: Request, res: Response) => {
-  const results = validationResult(req);
-  if (!results.isEmpty()) {
-    res.status(400).json({ errors: results.array().map((err) => err.msg) });
-    return;
+const getAllSchema = z.object({
+  query: z.object({
+    limit: z.number().min(1).int().default(20),
+    offset: z.number().min(0).int().default(0),
+    filter: z.string().optional(),
+  })
+});
+
+const getOneSchema = z.object({
+  params: z.object({
+    id: z.coerce.number().positive(),
+  })
+});
+
+const createSchema = z.object({
+  body: z.object({
+    name: z.string(),
+    description: z.string(),
+  })
+});
+
+const updateSchema = z.object({
+  params: z.object({
+    id: z.number().positive(),
+  }),
+  body: z.object({
+    name: z.string().optional(),
+    description: z.string().optional(),
+  })
+}).refine((data) => {
+  if (!data.body.name && !data.body.description) {
+    return false;
   }
-  const { limit, offset, filter } = matchedData(req) as { limit?: number, offset?: number, filter?: string };
+  return true;
+}, { message: "At least one field must be updated" });
 
-  const filters: SQL[] = []
-  if (filter) {
-    filters.push(ilike(userStatusesTable.name, filter))
-  }
-  const foundRoles = await getUserStatuses(filters, limit, offset);
+const deleteSchema = z.object({
+  params: z.object({
+    id: z.number().positive(),
+  })
+});
 
-  res.json(foundRoles);
-};
+export class UserStatesController {
+  static getAll = async (req: Request, res: Response) => {
+    const result = getAllSchema.safeParse({ query: req.query });
+    if (!result.success) {
+      res.status(400).json({ errors: zodErrorToErrorList(result.error) });
+      return;
+    }
+    const { query: { limit, offset, filter } } = result.data;
 
-export const createUserStatusController = async (req: Request, res: Response) => {
-  const results = validationResult(req);
-  if (!results.isEmpty()) {
-    res.status(400).json({ errors: results.array().map((err) => err.msg) });
-    return;
-  }
+    const filters: SQL[] = []
+    if (filter) {
+      filters.push(ilike(userStatusesTable.name, filter))
+    }
+    try {
+      const foundRoles = await UserStatusesHandler.getAll(filters, limit, offset);
+      res.json(foundRoles);
+    } catch (error) {
+      res.status(500).json({ errors: ["An error occurred"] });
+    }
+  };
 
-  const { name, description } = matchedData(req) as { name: string, description: string };
+  static create = async (req: Request, res: Response) => {
+    const result = createSchema.safeParse({ body: req.body });
+    if (!result.success) {
+      res.status(400).json({ errors: zodErrorToErrorList(result.error) });
+      return;
+    }
 
-  const existentStatus = await createUserStatus({
-    name,
-    description
-  });
+    try {
+      const existentStatus = await UserStatusesHandler.create(result.data.body);
+      res.status(201).json(existentStatus);
+    } catch (error) {
+      if (error instanceof DatabaseError) {
+        res.status(error.code).json({ errors: [error.message] });
+        return;
+      }
+      res.status(500).json({ errors: ["An error occurred"] });
+    }
+  };
 
-  if (!existentStatus) {
-    res.status(400).json({ errors: ["Status already exists"] });
-    return;
-  }
+  static getOne = async (req: Request, res: Response) => {
+    const result = getOneSchema.safeParse({ params: req.params });
+    if (!result.success) {
+      res.status(400).json({ errors: zodErrorToErrorList(result.error) });
+      return;
+    }
 
-  res.status(201).json({ message: "Status created successfully" });
-};
+    const { params: { id } } = result.data;
 
-export const getUserStatusController = async (req: Request, res: Response) => {
-  const results = validationResult(req);
-  if (!results.isEmpty()) {
-    res.status(400).json({ errors: results.array().map((err) => err.msg) });
-    return;
-  }
-  const { id } = matchedData(req) as { id: number };
+    try {
+      const foundStatus = await UserStatusesHandler.getOne({ id });
 
-  const foundStatus = await getUserStatus({ id });
+      if (!foundStatus) {
+        res.status(404).json({ errors: ["Status not found"] });
+        return;
+      }
 
-  if (!foundStatus) {
-    res.status(404).json({ errors: ["Status not found"] });
-    return;
-  }
+      res.json(foundStatus);
+    } catch (error) {
+      res.status(500).json({ errors: ["An error occurred"] });
+    }
+  };
 
-  res.json(foundStatus);
-};
+  static update = async (req: Request, res: Response) => {
+    const result = updateSchema.safeParse({ body: req.body });
+    if (!result.success) {
+      res.status(400).json({ errors: zodErrorToErrorList(result.error) });
+      return;
+    }
+    const { params: { id }, body: { name, description } } = result.data;
 
-export const updateUserStatusController = async (req: Request, res: Response) => {
-  const results = validationResult(req);
-  if (!results.isEmpty()) {
-    res.status(400).json({ errors: results.array().map((err) => err.msg) });
-    return;
-  }
+    if (!name && !description) {
+      res.status(400).json({ errors: ["At least one field must be updated"] });
+      return;
+    }
 
-  const { id, name, description } = matchedData(req) as { id: number, name?: string, description?: string };
-  if (!name && !description) {
-    res.status(400).json({ errors: ["At least one field must be updated"] });
-    return;
-  }
+    try {
+      const role = await UserStatusesHandler.update(id, { name, description });
+      res.json(role);
+    } catch (error) {
+      if (error instanceof Error) {
+        res.status(500).json({ errors: ["An error occurred"] });
+      }
+    }
+  };
 
-  try {
-    const role = await updateUserStatus(id, { name, description });
-    res.json(role);
-  } catch (error) {
-    console.log("TIPO: ", typeof error, "OBJECT: ", error);
-    res.status(500).json({ errors: [error] });
-  }
-};
-
-export const deleteUserStatusController = async (req: Request, res: Response) => {
-  const results = validationResult(req);
-  if (!results.isEmpty()) {
-    res.status(400).json({ errors: results.array().map((err) => err.msg) });
-    return;
-  }
-
-  const { id } = matchedData(req) as { id: number };
-  const role = await deleteUserStatus(id);
-
-  if (!role) {
-    res.status(404).json({ errors: ["Role not found"] });
-    return;
-  }
-
-  res.json(role);
-};
+  static delete = async (req: Request, res: Response) => {
+    const result = deleteSchema.safeParse({ params: req.params });
+    if (!result.success) {
+      res.status(400).json({ errors: zodErrorToErrorList(result.error) });
+      return;
+    }
+    const { params: { id } } = result.data;
+    try {
+      const role = await UserStatusesHandler.delete(id);
+      if (!role) {
+        res.status(404).json({ errors: ["Role not found"] });
+        return;
+      }
+      res.json(role);
+    } catch (error) {
+      res.status(500).json({ errors: ["An error occurred"] });
+    }
+  };
+}

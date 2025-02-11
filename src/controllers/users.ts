@@ -1,120 +1,186 @@
-import { getUserRole } from "@/handlers/user-roles";
-import { getUserStatus } from "@/handlers/user-statuses";
-import { createUser, deleteUser, getUserById, getUsers, updateUser } from "@/handlers/users";
-import { InsertUserRole, InsertUserStatus, SelectUserRole } from "@/types";
+import { UserRolesHandler } from "@/handlers/user-roles";
+import { UserStatusesHandler } from "@/handlers/user-statuses";
+import { UserHandler } from "@/handlers/users";
+import { DatabaseError } from "@/lib/errors";
+import { expandSchema, getCurrentUser, zodErrorToErrorList } from "@/lib/utils";
 import { genSalt, hash } from "bcrypt";
 import { Request, Response } from "express";
-import { matchedData, validationResult } from "express-validator";
+import { z } from "zod";
 
-export const getUsersController = async (req: Request, res: Response) => {
-  try {
-    const results = validationResult(req);
-    if (!results.isEmpty()) {
-      res.status(400).json({ errors: results.array().map((err) => err.msg) });
+const getAllSchema = z.object({
+  query: z.object({
+    limit: z.number().min(1).int().default(20),
+    offset: z.number().min(0).int().default(0),
+    filter: z.string().optional(),
+    expand: expandSchema,
+  })
+});
+
+const getOneSchema = z.object({
+  params: z.object({
+    id: z.coerce.number().positive(),
+  }),
+  query: z.object({
+    expand: expandSchema,
+  }),
+});
+
+const createSchema = z.object({
+  query: z.object({
+    expand: expandSchema,
+  }),
+  body: z.object({
+    name: z.string(),
+    roleId: z.number().positive(),
+    statusId: z.number().positive(),
+    email: z.string().email(),
+    password: z.string(),
+  }),
+});
+
+const updateSchema = z.object({
+  params: z.object({
+    id: z.number().positive(),
+  }),
+  query: z.object({
+    expand: expandSchema,
+  }),
+  body: z.object({
+    name: z.string().optional(),
+    roleId: z.number().positive().optional(),
+    statusId: z.number().positive().optional(),
+    email: z.string().email().optional(),
+    password: z.string().optional(),
+  })
+}).refine((data) => {
+  if (!data.body.name && !data.body.roleId && !data.body.statusId && !data.body.email && !data.body.password) {
+    return false;
+  }
+  return true;
+}, { message: "At least one field must be updated" });
+
+const deleteSchema = z.object({
+  params: z.object({
+    id: z.number().positive(),
+  }),
+  query: z.object({
+    expand: expandSchema,
+  }),
+});
+
+export class UsersController {
+  static getAll = async (req: Request, res: Response) => {
+    const result = getAllSchema.safeParse({ query: req.query });
+    if (!result.success) {
+      res.status(400).json({ errors: zodErrorToErrorList(result.error) });
       return;
     }
-    const { limit, offset, expand } = matchedData(req) as { limit?: number, offset?: number, expand?: boolean };
-    const users = await getUsers({ limit, offset, expand: expand !== undefined || expand == true });
+    const { query: { limit, offset, filter, expand } } = result.data;
 
-    res.json(users);
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ errors: ["An error occurred"] });
-  }
-};
+    try {
+      const users = await UserHandler.getAll({ limit, offset, expand });
 
-export const createUserController = async (req: Request, res: Response) => {
-  try {
-    const results = validationResult(req);
-    if (!results.isEmpty()) {
-      res.status(400).json({ errors: results.array().map((err) => err.msg) });
+      res.json(users);
+    } catch (error) {
+      console.log(error);
+      res.status(500).json({ errors: ["An error occurred"] });
+    }
+  };
+
+  static create = async (req: Request, res: Response) => {
+    const result = createSchema.safeParse({ body: req.body, query: req.query });
+    if (!result.success) {
+      res.status(400).json({ errors: zodErrorToErrorList(result.error) });
       return;
     }
-    const { name, roleId, statusId, email, password, expand } = matchedData(req) as {
-      name: string,
-      roleId?: InsertUserRole["id"],
-      statusId?: InsertUserStatus["id"],
-      email: string,
-      password: string,
-      expand?: boolean
-    };
+    const { body: { name, roleId, statusId, email, password }, query: { expand } } = result.data;
+    try {
+      const role = await UserRolesHandler.getOne({ id: roleId, name: "user" });
+      if (!role) {
+        res.status(400).json({ errors: ["Role not found"] });
+        return;
+      }
 
-    const createdUser = await createUser({
-      name,
-      email,
-      roleId: roleId ?? (await getUserRole({ name: "user" }))!.id,
-      statusId: statusId ?? (await getUserStatus({ name: "pending" }))!.id,
-      password: await hash(password, await genSalt()),
-    }, { expand: expand !== undefined || expand == true });
+      const currentUser = getCurrentUser(req)!;
 
-    res.status(201).json(createdUser);
-  } catch (error) {
-    res.status(500).json({ errors: ["An error occurred"] });
-  }
-};
+      if (currentUser.role.name !== "admin" && currentUser.role.name === "admin") {
+        res.status(404).json({ errors: ["You are not authorized to create this user"] });
+        return;
+      }
 
-export const getUserByIdController = async (req: Request, res: Response) => {
-  try {
-    const results = validationResult(req);
-    if (!results.isEmpty()) {
-      res.status(400).json({ errors: results.array().map((err) => err.msg) });
+      const status = await UserStatusesHandler.getOne({ id: statusId, name: "pending" });
+      if (!status) {
+        res.status(400).json({ errors: ["Status not found"] });
+        return;
+      }
+      const createdUser = await UserHandler.create({
+        name,
+        email,
+        roleId: role.id,
+        statusId: status.id,
+        password: await hash(password, await genSalt()),
+      }, { expand });
+
+      res.status(201).json(createdUser);
+    } catch (error) {
+      if (error instanceof DatabaseError) {
+        res.status(error.code).json({ errors: [error.message] });
+        return;
+      }
+      res.status(500).json({ errors: ["An error occurred"] });
+    }
+  };
+
+  static getOne = async (req: Request, res: Response) => {
+    const result = getOneSchema.safeParse({ params: req.params, query: req.query });
+    if (!result.success) {
+      res.status(400).json({ errors: zodErrorToErrorList(result.error) });
       return;
     }
-    const { id, expand } = matchedData(req) as { id: SelectUserRole["id"], expand?: boolean };
+    const { params: { id }, query: { expand } } = result.data;
+    try {
+      const user = await UserHandler.getOne({ id, expand });
+      res.json(user);
+    } catch (error) {
+      res.status(500).json({ errors: ["An error occurred"] });
+    }
+  };
 
-    const user = await getUserById(id, { expand: expand !== undefined || expand == true });
-
-    res.json(user);
-  } catch (error) {
-    res.status(500).json({ errors: ["An error occurred"] });
-  }
-};
-
-export const updateUserController = async (req: Request, res: Response) => {
-  try {
-    const results = validationResult(req);
-    if (!results.isEmpty()) {
-      res.status(400).json({ errors: results.array().map((err) => err.msg) });
+  static update = async (req: Request, res: Response) => {
+    const result = updateSchema.safeParse({ body: req.body, params: req.params, query: req.query });
+    if (!result.success) {
+      res.status(400).json({ errors: zodErrorToErrorList(result.error) });
       return;
     }
+    const { body: { name, roleId, statusId, email, password }, params: { id }, query: { expand } } = result.data;
+    try {
+      const updatedUser = await UserHandler.update(id, {
+        name,
+        email,
+        roleId,
+        statusId,
+        password: password ? await hash(password, await genSalt()) : undefined,
+      }, { expand });
 
-    const { id, name, roleId, statusId, email, password, expand } = matchedData(req) as {
-      id: SelectUserRole["id"],
-      name?: string,
-      roleId?: SelectUserRole["id"],
-      statusId?: SelectUserRole["id"],
-      email?: string,
-      password?: string,
-      expand?: boolean
-    };
+      res.json(updatedUser);
+    } catch (error) {
+      res.status(500).json({ errors: ["An error occurred"] });
+    }
+  };
 
-    const updatedUser = await updateUser(id, {
-      name,
-      email,
-      roleId,
-      statusId,
-      password: password ? await hash(password, await genSalt()) : undefined,
-    }, { expand: expand !== undefined || expand == true });
-
-    res.json(updatedUser);
-  } catch (error) {
-    res.status(500).json({ errors: ["An error occurred"] });
-  }
-};
-
-export const deleteUserController = async (req: Request, res: Response) => {
-  try {
-    const results = validationResult(req);
-    if (!results.isEmpty()) {
-      res.status(400).json({ errors: results.array().map((err) => err.msg) });
+  static delete = async (req: Request, res: Response) => {
+    const result = deleteSchema.safeParse({ params: req.params, query: req.query });
+    if (!result.success) {
+      res.status(400).json({ errors: zodErrorToErrorList(result.error) });
       return;
     }
+    const { params: { id }, query: { expand } } = result.data;
+    try {
+      const deletedUser = await UserHandler.delete(id, { expand });
 
-    const { id, expand } = matchedData(req) as { id: SelectUserRole["id"], expand?: boolean };
-    const deletedUser = await deleteUser(id, { expand: expand !== undefined || expand == true });
-
-    res.json(deletedUser);
-  } catch (error) {
-    res.status(500).json({ errors: ["An error occurred"] });
-  }
-};
+      res.json(deletedUser);
+    } catch (error) {
+      res.status(500).json({ errors: ["An error occurred"] });
+    }
+  };
+}
