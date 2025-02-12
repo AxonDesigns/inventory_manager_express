@@ -1,7 +1,8 @@
 import { UserRolesHandler } from "@/handlers/user-roles";
 import { UserStatusesHandler } from "@/handlers/user-statuses";
 import { UserHandler } from "@/handlers/users";
-import { DatabaseError } from "@/lib/errors";
+import { errorHandler } from "@/lib/error-handling";
+import { DatabaseError, ValidationError } from "@/lib/errors";
 import { expandSchema, getCurrentUser, zodErrorToErrorList } from "@/lib/utils";
 import { genSalt, hash } from "bcrypt";
 import { Request, Response } from "express";
@@ -83,7 +84,7 @@ export class UsersController {
       res.json(users);
     } catch (error) {
       console.log(error);
-      res.status(500).json({ errors: ["An error occurred"] });
+      errorHandler(req, res, error);
     }
   };
 
@@ -123,11 +124,7 @@ export class UsersController {
 
       res.status(201).json(createdUser);
     } catch (error) {
-      if (error instanceof DatabaseError) {
-        res.status(error.code).json({ errors: [error.message] });
-        return;
-      }
-      res.status(500).json({ errors: ["An error occurred"] });
+      errorHandler(req, res, error);
     }
   };
 
@@ -142,6 +139,14 @@ export class UsersController {
       const user = await UserHandler.getOne({ id, expand });
       res.json(user);
     } catch (error) {
+      if (error instanceof ValidationError) {
+        res.status(400).json({ errors: error.errors });
+        return;
+      }
+      if (error instanceof DatabaseError) {
+        res.status(error.code).json({ errors: [error.message] });
+        return;
+      }
       res.status(500).json({ errors: ["An error occurred"] });
     }
   };
@@ -164,7 +169,7 @@ export class UsersController {
 
       res.json(updatedUser);
     } catch (error) {
-      res.status(500).json({ errors: ["An error occurred"] });
+      errorHandler(req, res, error);
     }
   };
 
@@ -180,7 +185,7 @@ export class UsersController {
 
       res.json(deletedUser);
     } catch (error) {
-      res.status(500).json({ errors: ["An error occurred"] });
+      errorHandler(req, res, error);
     }
   };
 }

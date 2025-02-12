@@ -26,62 +26,55 @@ export class UserHandler {
     offset = defaultOffset,
     asPrivate
   }: GetUsersProps<T, U>): Promise<ExpandablePublicableUser<T, U>[]> {
-    try {
-      let rawUsers = []
-      if (expand) {
-        const { roleId, statusId, ...fields } = getTableColumns(usersTable)
-        rawUsers = await db.select({
-          ...fields,
-          role: getTableColumns(userRolesTable),
-          status: getTableColumns(userStatusesTable),
-        }).from(usersTable)
-          .where(and(...filters))
-          .innerJoin(userRolesTable, eq(usersTable.id, userRolesTable.id))
-          .innerJoin(userStatusesTable, eq(usersTable.id, userStatusesTable.id))
-          .limit(limit).offset(offset);
-      } else {
-        rawUsers = await db.select().from(usersTable)
-          .where(and(...filters))
-          .limit(limit).offset(offset);
-      }
-
-      const users = asPrivate ? rawUsers : rawUsers.map(({ password, verificationToken, ...payload }) => payload);
-
-      return users as ExpandablePublicableUser<T, U>[];
-    } catch (error) {
-      throw error;
+    let rawUsers = []
+    if (expand) {
+      const { roleId, statusId, ...fields } = getTableColumns(usersTable)
+      rawUsers = await db.select({
+        ...fields,
+        role: getTableColumns(userRolesTable),
+        status: getTableColumns(userStatusesTable),
+      }).from(usersTable)
+        .where(and(...filters))
+        .innerJoin(userRolesTable, eq(usersTable.id, userRolesTable.id))
+        .innerJoin(userStatusesTable, eq(usersTable.id, userStatusesTable.id))
+        .limit(limit).offset(offset);
+    } else {
+      rawUsers = await db.select().from(usersTable)
+        .where(and(...filters))
+        .limit(limit).offset(offset);
     }
+
+    const users = asPrivate ? rawUsers : rawUsers.map(({ password, verificationToken, ...payload }) => payload);
+
+    return users as ExpandablePublicableUser<T, U>[];
   }
 
   static async create<T extends boolean, U extends boolean>(
     values: InsertUser,
     { expand, asPrivate }: { expand?: T, asPrivate?: U }) {
-    try {
-      const existentUser = await db.select().from(usersTable)
-        .where(eq(usersTable.email, values.email));
-      if (existentUser.length > 0) {
-        throw new DatabaseError("A user with this email already exists", 400);
-      }
 
-      const [{ id: createdId }] = await db.insert(usersTable).values({
-        ...values,
-        password: await hash(values.password, await genSalt()),
-      }).$returningId();
-
-      if (!createdId) {
-        throw new DatabaseError("User could not be created", 500);
-      }
-
-      const createdUser = await this.getOne<T, U>({
-        id: createdId,
-        expand,
-        asPrivate
-      });
-
-      return createdUser;
-    } catch (error) {
-      throw error;
+    const existentUser = await db.select().from(usersTable)
+      .where(eq(usersTable.email, values.email));
+    if (existentUser.length > 0) {
+      throw new DatabaseError("A user with this email already exists", 400);
     }
+
+    const [{ id: createdId }] = await db.insert(usersTable).values({
+      ...values,
+      password: await hash(values.password, await genSalt()),
+    }).$returningId();
+
+    if (!createdId) {
+      throw new DatabaseError("User could not be created", 500);
+    }
+
+    const createdUser = await this.getOne<T, U>({
+      id: createdId,
+      expand,
+      asPrivate
+    });
+
+    return createdUser;
   }
 
   static async getOne<T extends boolean, U extends boolean>(
@@ -99,7 +92,7 @@ export class UserHandler {
       expand,
       asPrivate
     });
-    if (!user) return null;
+    if (!user) throw new DatabaseError("User not found", 404);
     return user;
   }
 
@@ -107,40 +100,31 @@ export class UserHandler {
     values: Partial<SelectUser>,
     { expand, asPrivate }: { expand?: T, asPrivate?: U }
   ) {
-    try {
+    const fields = Object.values(values).filter(e => e !== undefined);
 
-      const fields = Object.values(values).filter(e => e !== undefined);
-
-      if (fields.length === 0) {
-        return null;
-      }
-
-      await db.update(usersTable).set({
-        ...values,
-        password: values.password ? await hash(values.password, await genSalt()) : undefined,
-      }).where(eq(usersTable.id, id));
-
-      const updatedUser = await this.getOne<T, U>({
-        id,
-        expand,
-        asPrivate
-      });
-
-      return updatedUser;
-    } catch (error) {
-      return null;
+    if (fields.length === 0) {
+      throw new ValidationError(["At least one field must be provided"]);
     }
+
+    await db.update(usersTable).set({
+      ...values,
+      password: values.password ? await hash(values.password, await genSalt()) : undefined,
+    }).where(eq(usersTable.id, id));
+
+    const updatedUser = await this.getOne<T, U>({
+      id,
+      expand,
+      asPrivate
+    });
+
+    return updatedUser;
   }
 
   static async delete<T extends boolean, U extends boolean>(
     id: SelectUser['id'],
     { expand, asPrivate }: { expand?: T, asPrivate?: U }) {
-    try {
-      const user = await this.getOne<T, U>({ id, expand, asPrivate });
-      await db.delete(usersTable).where(eq(usersTable.id, id));
-      return user;
-    } catch (error) {
-      return null;
-    }
+    const user = await this.getOne<T, U>({ id, expand, asPrivate });
+    await db.delete(usersTable).where(eq(usersTable.id, id));
+    return user;
   }
 }

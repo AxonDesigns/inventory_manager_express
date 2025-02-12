@@ -6,6 +6,7 @@ import { eq, SQL } from "drizzle-orm";
 import { z } from "zod";
 import { DatabaseError } from "@/lib/errors";
 import { zodErrorToErrorList } from "@/lib/utils";
+import { errorHandler } from "@/lib/error-handling";
 
 /* 
 expand: z.preprocess((value) => {
@@ -66,7 +67,7 @@ export class UserRolesController {
       const foundRoles = await UserRolesHandler.getAll(filters, limit, offset);
       res.json(foundRoles);
     } catch (error) {
-      res.status(500).json({ errors: ["An error occurred"] });
+      errorHandler(req, res, error);
     }
   };
 
@@ -86,7 +87,7 @@ export class UserRolesController {
       }
       res.json(foundRole);
     } catch (error) {
-      res.status(500).json({ errors: ["An error occurred"] });
+      errorHandler(req, res, error);
     }
   };
 
@@ -100,12 +101,8 @@ export class UserRolesController {
     try {
       const existentRole = await UserRolesHandler.create(result.data.body);
       res.status(201).json(existentRole);
-    } catch (error: any) {
-      if (error instanceof DatabaseError) {
-        res.status(error.code).json({ errors: [error.message] });
-        return;
-      }
-      res.status(500).json({ errors: ["An error occurred"] });
+    } catch (error) {
+      errorHandler(req, res, error);
     }
   }
 
@@ -121,8 +118,8 @@ export class UserRolesController {
     try {
       const role = await UserRolesHandler.update(id, { name, description });
       res.json(role);
-    } catch (error: any) {
-      res.status(500).json({ errors: ["An error occurred"] });
+    } catch (error) {
+      errorHandler(req, res, error);
     }
   }
 
@@ -137,8 +134,8 @@ export class UserRolesController {
     try {
       const role = await UserRolesHandler.delete(id);
       res.json(role);
-    } catch (error: any) {
-      res.status(500).json({ errors: ["An error occurred"] });
+    } catch (error) {
+      errorHandler(req, res, error);
     }
   }
 }

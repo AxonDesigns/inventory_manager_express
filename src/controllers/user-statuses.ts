@@ -1,6 +1,7 @@
 import { userStatusesTable } from "@/db/schema/user-statuses";
 import { ilike } from "@/db/utils";
 import { UserStatusesHandler } from "@/handlers/user-statuses";
+import { errorHandler } from "@/lib/error-handling";
 import { DatabaseError } from "@/lib/errors";
 import { zodErrorToErrorList } from "@/lib/utils";
 import { SQL } from "drizzle-orm";
@@ -66,7 +67,7 @@ export class UserStatesController {
       const foundRoles = await UserStatusesHandler.getAll(filters, limit, offset);
       res.json(foundRoles);
     } catch (error) {
-      res.status(500).json({ errors: ["An error occurred"] });
+      errorHandler(req, res, error);
     }
   };
 
@@ -81,11 +82,7 @@ export class UserStatesController {
       const existentStatus = await UserStatusesHandler.create(result.data.body);
       res.status(201).json(existentStatus);
     } catch (error) {
-      if (error instanceof DatabaseError) {
-        res.status(error.code).json({ errors: [error.message] });
-        return;
-      }
-      res.status(500).json({ errors: ["An error occurred"] });
+      errorHandler(req, res, error);
     }
   };
 
@@ -108,7 +105,7 @@ export class UserStatesController {
 
       res.json(foundStatus);
     } catch (error) {
-      res.status(500).json({ errors: ["An error occurred"] });
+      errorHandler(req, res, error);
     }
   };
 
@@ -129,9 +126,7 @@ export class UserStatesController {
       const role = await UserStatusesHandler.update(id, { name, description });
       res.json(role);
     } catch (error) {
-      if (error instanceof Error) {
-        res.status(500).json({ errors: ["An error occurred"] });
-      }
+      errorHandler(req, res, error);
     }
   };
 
@@ -150,7 +145,7 @@ export class UserStatesController {
       }
       res.json(role);
     } catch (error) {
-      res.status(500).json({ errors: ["An error occurred"] });
+      errorHandler(req, res, error);
     }
   };
 }

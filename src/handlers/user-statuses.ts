@@ -26,17 +26,17 @@ export class UserStatusesHandler {
     }
   }
 
-  static getOne = async ({ id, name }: GetUserStatusProps): Promise<SelectUserStatus | null> => {
+  static getOne = async ({ id, name }: GetUserStatusProps) => {
     if (!id && !name) throw new ValidationError(["Either id or name must be provided"]);
     try {
-      let record: SelectUserStatus | null = null;
-      const records = await this.getAll([id ? (
+      let [record] = await this.getAll([id ? (
         eq(userStatusesTable.id, id)
       ) : (
         eq(userStatusesTable.name, name!)
       )]);
-      if (records.length === 0) return null;
-      record = records[0];
+      if (!record) {
+        throw new DatabaseError("User status not found", 404);
+      }
       return record;
     } catch (error) {
       throw error;
@@ -70,19 +70,14 @@ export class UserStatusesHandler {
   }
 
   static delete = async (id: SelectUserStatus['id']) => {
-    try {
-      let returning = await db.transaction(async tx => {
-        const [existent] = await db.select().from(userStatusesTable).where(eq(userStatusesTable.id, id));
-        if (!existent) {
-          return null;
-        }
-        await tx.delete(userStatusesTable).where(eq(userStatusesTable.id, id));
-        return existent;
-      });
-      return returning;
-    } catch (error) {
-      console.log(typeof error, error);
-      return null;
-    }
+    let returning = await db.transaction(async tx => {
+      const [existent] = await db.select().from(userStatusesTable).where(eq(userStatusesTable.id, id));
+      if (!existent) {
+        throw new DatabaseError("User status not found", 404);
+      }
+      await tx.delete(userStatusesTable).where(eq(userStatusesTable.id, id));
+      return existent;
+    });
+    return returning;
   }
 }
